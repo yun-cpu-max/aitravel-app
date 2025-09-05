@@ -1,12 +1,11 @@
-// src/components/Navbar.jsx
-
 import React from 'react';
 
-const Navbar = () => {
+const Navbar = ({ onOpenModal }) => {
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+      {/* max-w-7xl -> max-w-full로 변경 */}
+      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-24">
           {/* 로고 영역 */}
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center space-x-3">
@@ -17,9 +16,16 @@ const Navbar = () => {
             </div>
           </div>
           
-          {/* 링크 영역 (항상 보임) */}
+          {/* 링크 및 버튼 영역 */}
           <div className="block">
             <div className="ml-6 flex items-center space-x-4">
+              {/* 이용 방법 버튼 */}
+              <button
+                onClick={onOpenModal}
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+              >
+                이용 방법
+              </button>
               <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
                 로그인
               </a>
