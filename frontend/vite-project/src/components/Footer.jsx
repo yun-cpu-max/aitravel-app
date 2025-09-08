@@ -9,6 +9,21 @@ const Footer = () => {
         <p className="text-sm">
           © 2025 AI 여행 플래너. All rights reserved.
         </p>
+        {/* <p className="text-sm">
+          이용약관
+        </p>
+        <p className="text-sm">
+          개인정보처리방침
+        </p>
+        <p className="text-sm">
+          고객센터
+        </p>
+        <p className="text-sm">
+          제휴문의
+        </p> */}
+        <p className="text-sm">
+          이메일 : rhddbswo0625@naver.com
+        </p>
       </div>
     </footer>
   );
