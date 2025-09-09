@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import Navbar from './components/Navbar.jsx';
-import HeroSection from './components/HeroSection.jsx';
-import FeatureSection from './components/FeatureSection.jsx';
-import Footer from './components/Footer.jsx';
-import HowItWorksModal from './components/HowItWorksModal.jsx';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Navbar from './components/Navbar';
+import HeroSection from './components/HeroSection';
+import FeatureSection from './components/FeatureSection';
+import HowItWorksModal from './components/HowItWorksModal';
+import Footer from './components/Footer';
+import TripPlanPage from './pages/TripPlanPage';
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -17,15 +19,29 @@ function App() {
   };
 
   return (
-    <>
-      <Navbar onOpenModal={handleOpenModal} />
-      <main>
-        <HeroSection />
-        <FeatureSection />
-      </main>
-      <Footer />
-      <HowItWorksModal isOpen={isModalOpen} onClose={handleCloseModal} />
-    </>
+    <BrowserRouter>
+      <div className="flex flex-col min-h-screen font-sans">
+        <Navbar onOpenModal={handleOpenModal} />
+        <HowItWorksModal isOpen={isModalOpen} onClose={handleCloseModal} />
+        
+        <main className="flex-grow">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <>
+                  <HeroSection />
+                  <FeatureSection />
+                </>
+              }
+            />
+            <Route path="/trip-plan" element={<TripPlanPage />} />
+          </Routes>
+        </main>
+
+        <Footer />
+      </div>
+    </BrowserRouter>
   );
 }
 
