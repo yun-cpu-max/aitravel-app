@@ -1,6 +1,15 @@
 import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 const Navbar = ({ onOpenModal }) => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       {/* max-w-7xl -> max-w-full로 변경 */}
@@ -26,12 +35,62 @@ const Navbar = ({ onOpenModal }) => {
               >
                 이용 방법
               </button>
-              <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
-                로그인
-              </a>
-              <a href="#" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-sm">
-                회원가입
-              </a>
+              
+              {/* 여행 계획하기 버튼 */}
+              <Link
+                to="/trip-plan"
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+              >
+                여행 계획하기
+              </Link>
+
+              {/* 인증 상태에 따른 버튼 표시 */}
+              {isAuthenticated() ? (
+                <>
+                  {/* 사용자 프로필 드롭다운 */}
+                  <div className="relative group">
+                    <button className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-sm font-bold text-blue-600">
+                          {user?.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                      <span>{user?.name || '사용자'}</span>
+                    </button>
+                    
+                    {/* 드롭다운 메뉴 */}
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                      <Link
+                        to="/profile"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        프로필 관리
+                      </Link>
+                      <button
+                        onClick={handleLogout}
+                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        로그아웃
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                  >
+                    로그인
+                  </Link>
+                  <Link
+                    to="/login"
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-sm"
+                  >
+                    시작하기
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>
