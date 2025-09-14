@@ -1,7 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const TripPlanPage = () => {
+  // STEP0: 예약/교통 정보 입력 (선행 단계)
+  const [step, setStep] = useState(0); // 0: 예약/출발 정보, 1: 기본 폼, 2: 챗봇, 3: 결과
+  const [travelStartType, setTravelStartType] = useState('flight'); // 'flight'|'location'|'accommodation'
+  const [flightInfo, setFlightInfo] = useState({
+    arrivalAirport: '',
+    arrivalDateTime: '', // ISO string
+    departureAirport: '',
+    departureDateTime: ''
+  });
+  const [startLocation, setStartLocation] = useState(''); // 국내 출발 위치 or 숙소 주소
+
   // Step 1: Form 기반 입력
   const [destination, setDestination] = useState('');
   const [date, setDate] = useState('');
@@ -12,14 +23,15 @@ const TripPlanPage = () => {
   const [numChildren, setNumChildren] = useState(0);
   const [budget, setBudget] = useState(1500000); // KRW 기준 예시
 
-  // Step 제어
-  const [step, setStep] = useState(1); // 1: 폼, 2: 챗봇 튜닝, 3: 결과 미리보기
-
   // Step 2: 챗봇 세부 조정(로컬 상태)
   const [chatMessages, setChatMessages] = useState([
     { role: 'assistant', content: '여행 스타일은 어떤 편이세요? (휴양/액티비티/문화 탐방/미식 등)' },
   ]);
   const [chatInput, setChatInput] = useState('');
+
+  // Day-level transport simulation
+  const [transportByDay, setTransportByDay] = useState([]);
+  // e.g. [{ day:1, defaultMode:'대중교통', segments: [{from:'A', to:'B', mode:'도보'}] }, ...]
 
   // 달력 월 이동 상태
   const today = new Date();
@@ -35,20 +47,107 @@ const TripPlanPage = () => {
 
   const navigate = useNavigate();
 
+  // localStorage 저장/복원
+  useEffect(() => {
+    const savedData = localStorage.getItem('tripPlanData');
+    if (savedData) {
+      const data = JSON.parse(savedData);
+      setStep(data.step || 0);
+      setTravelStartType(data.travelStartType || 'flight');
+      setFlightInfo(data.flightInfo || { arrivalAirport: '', arrivalDateTime: '', departureAirport: '', departureDateTime: '' });
+      setStartLocation(data.startLocation || '');
+      setDestination(data.destination || '');
+      setDate(data.date || '');
+      setStartDate(data.startDate ? new Date(data.startDate) : null);
+      setEndDate(data.endDate ? new Date(data.endDate) : null);
+      setNumAdults(data.numAdults || 2);
+      setNumChildren(data.numChildren || 0);
+      setBudget(data.budget || 1500000);
+      setChatMessages(data.chatMessages || [{ role: 'assistant', content: '여행 스타일은 어떤 편이세요? (휴양/액티비티/문화 탐방/미식 등)' }]);
+      setTransportByDay(data.transportByDay || []);
+    }
+  }, []);
+
+  // 데이터 저장
+  const saveToLocalStorage = () => {
+    const data = {
+      step,
+      travelStartType,
+      flightInfo,
+      startLocation,
+      destination,
+      date,
+      startDate: startDate?.toISOString(),
+      endDate: endDate?.toISOString(),
+      numAdults,
+      numChildren,
+      budget,
+      chatMessages,
+      transportByDay
+    };
+    localStorage.setItem('tripPlanData', JSON.stringify(data));
+  };
+
+  // arrival 정보로 startDate 동기화
+  const syncStartDateWithArrival = (arrivalISO) => {
+    if (arrivalISO) {
+      const arrivalDate = new Date(arrivalISO);
+      setStartDate(arrivalDate);
+      const formattedDate = `${arrivalDate.getFullYear()}-${(arrivalDate.getMonth() + 1).toString().padStart(2, '0')}-${arrivalDate.getDate().toString().padStart(2, '0')}`;
+      setDate(formattedDate);
+    }
+  };
+
+  // 교통수단 기반 추정 (플레이스홀더: 실제는 Directions API로 교체)
+  const estimateTravelTimeAndCost = (dayIndex, mode) => {
+    const baseTime = 60; // 분 기본값 예시
+    const modeFactors = { 
+      '도보': {t:1.5, c:0.2}, 
+      '대중교통': {t:1, c:1}, 
+      '차량(택시)': {t:0.7, c:4}, 
+      '렌터카': {t:0.8, c:2.5} 
+    };
+    const f = modeFactors[mode] || {t:1, c:1};
+    return { 
+      estimatedMinutes: Math.round(baseTime * f.t), 
+      estimatedCost: Math.round(5000 * f.c) 
+    };
+  };
+
+  // Step 0 검증 및 다음 단계로
+  const handleNextFromStep0 = () => {
+    if (travelStartType === 'flight') {
+      if (!flightInfo.arrivalAirport || !flightInfo.arrivalDateTime) {
+        alert('도착 공항과 도착 일시를 모두 입력해주세요.');
+        return;
+      }
+      syncStartDateWithArrival(flightInfo.arrivalDateTime);
+    } else if (travelStartType === 'location' || travelStartType === 'accommodation') {
+      if (!startLocation) {
+        alert('출발 위치를 입력해주세요.');
+        return;
+      }
+    }
+    setStep(1);
+    saveToLocalStorage();
+  };
+
   const handleNextFromForm = () => {
     if (!destination || !date) {
       alert('여행지와 날짜를 모두 입력해주세요.');
       return;
     }
     setStep(2);
+    saveToLocalStorage();
   };
 
   const handlePrev = () => {
-    setStep((prev) => Math.max(1, prev - 1));
+    setStep((prev) => Math.max(0, prev - 1));
   };
 
   const handleNextFromChat = () => {
     setStep(3);
+    saveToLocalStorage();
   };
 
   const handleConfirmPlan = () => {
@@ -85,7 +184,20 @@ const TripPlanPage = () => {
       const formattedEndDate = `${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')}`;
       setDate(`${formattedStartDate} ~ ${formattedEndDate}`);
       setIsCalendarOpen(false);
+      saveToLocalStorage();
     }
+  };
+
+  // Day별 교통수단 변경 핸들러
+  const handleTransportModeChange = (dayIndex, mode) => {
+    const newTransportByDay = [...transportByDay];
+    if (!newTransportByDay[dayIndex]) {
+      newTransportByDay[dayIndex] = { day: dayIndex + 1, defaultMode: mode, segments: [] };
+    } else {
+      newTransportByDay[dayIndex].defaultMode = mode;
+    }
+    setTransportByDay(newTransportByDay);
+    saveToLocalStorage();
   };
 
   const handlePrevMonth = () => {
@@ -160,10 +272,138 @@ const TripPlanPage = () => {
 
       {/* Step Indicator */}
       <div className="flex items-center justify-center gap-2 mb-6">
-        {[1,2,3].map((s) => (
+        {[0,1,2,3].map((s) => (
           <div key={s} className={`w-3 h-3 rounded-full ${step === s ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
         ))}
       </div>
+
+      {/* Step 0: 예약/교통 정보 입력 */}
+      {step === 0 && (
+        <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl mx-auto text-left">
+          <h2 className="text-2xl font-semibold text-gray-800 mb-6">출발점 정보 입력</h2>
+          <p className="text-gray-600 mb-6">AI가 정확한 일정을 생성하기 위해 출발점 정보가 필요합니다.</p>
+          
+          {/* 여행 시작 타입 선택 */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">여행 시작 방식</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="travelStartType"
+                  value="flight"
+                  checked={travelStartType === 'flight'}
+                  onChange={(e) => setTravelStartType(e.target.value)}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-medium">해외여행</div>
+                  <div className="text-sm text-gray-500">항공편 정보</div>
+                </div>
+              </label>
+              <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="travelStartType"
+                  value="location"
+                  checked={travelStartType === 'location'}
+                  onChange={(e) => setTravelStartType(e.target.value)}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-medium">국내여행</div>
+                  <div className="text-sm text-gray-500">출발 위치</div>
+                </div>
+              </label>
+              <label className="flex items-center p-4 border rounded-lg cursor-pointer hover:bg-gray-50">
+                <input
+                  type="radio"
+                  name="travelStartType"
+                  value="accommodation"
+                  checked={travelStartType === 'accommodation'}
+                  onChange={(e) => setTravelStartType(e.target.value)}
+                  className="mr-3"
+                />
+                <div>
+                  <div className="font-medium">숙소 예약</div>
+                  <div className="text-sm text-gray-500">숙소 주소</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          {/* 항공편 정보 입력 */}
+          {travelStartType === 'flight' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">도착 공항 *</label>
+                <input
+                  type="text"
+                  placeholder="예: 인천공항, 김포공항, 나리타공항"
+                  value={flightInfo.arrivalAirport}
+                  onChange={(e) => setFlightInfo(prev => ({ ...prev, arrivalAirport: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">도착 일시 *</label>
+                <input
+                  type="datetime-local"
+                  value={flightInfo.arrivalDateTime}
+                  onChange={(e) => setFlightInfo(prev => ({ ...prev, arrivalDateTime: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">출발 공항 (선택)</label>
+                  <input
+                    type="text"
+                    placeholder="예: 김해공항, 제주공항"
+                    value={flightInfo.departureAirport}
+                    onChange={(e) => setFlightInfo(prev => ({ ...prev, departureAirport: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">출발 일시 (선택)</label>
+                  <input
+                    type="datetime-local"
+                    value={flightInfo.departureDateTime}
+                    onChange={(e) => setFlightInfo(prev => ({ ...prev, departureDateTime: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 출발 위치 입력 */}
+          {(travelStartType === 'location' || travelStartType === 'accommodation') && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {travelStartType === 'location' ? '출발 위치' : '숙소 주소'} *
+              </label>
+              <input
+                type="text"
+                placeholder={travelStartType === 'location' ? '예: 서울역, 부산터미널, 집' : '예: 서울시 강남구 테헤란로 123'}
+                value={startLocation}
+                onChange={(e) => setStartLocation(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end mt-6">
+            <button
+              onClick={handleNextFromStep0}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
+            >
+              다음 (여행 정보 입력)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Step 1: 폼 입력 */}
       {step === 1 && (
@@ -360,17 +600,40 @@ const TripPlanPage = () => {
               <div className="bg-white p-6 rounded-lg shadow-md">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">일정 초안</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {[1,2,3].map((d) => (
-                    <div key={d} className="border rounded-lg p-4">
-                      <div className="text-sm text-gray-500 mb-1">Day {d}</div>
-                      <div className="font-semibold text-gray-800 mb-2">{destination || '여행지'} 탐방</div>
-                      <ul className="text-sm text-gray-700 list-disc pl-4 space-y-1">
-                        <li>주요 명소 방문</li>
-                        <li>추천 맛집</li>
-                        <li>이동 및 휴식</li>
-                      </ul>
-                    </div>
-                  ))}
+                  {[1,2,3].map((d) => {
+                    const dayIndex = d - 1;
+                    const transportMode = transportByDay[dayIndex]?.defaultMode || '대중교통';
+                    const transportEstimate = estimateTravelTimeAndCost(dayIndex, transportMode);
+                    
+                    return (
+                      <div key={d} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="text-sm text-gray-500">Day {d}</div>
+                          <select
+                            value={transportMode}
+                            onChange={(e) => handleTransportModeChange(dayIndex, e.target.value)}
+                            className="text-xs px-2 py-1 border rounded"
+                          >
+                            <option value="도보">도보</option>
+                            <option value="대중교통">대중교통</option>
+                            <option value="차량(택시)">차량(택시)</option>
+                            <option value="렌터카">렌터카</option>
+                            <option value="기타">기타</option>
+                          </select>
+                        </div>
+                        <div className="font-semibold text-gray-800 mb-2">{destination || '여행지'} 탐방</div>
+                        <ul className="text-sm text-gray-700 list-disc pl-4 space-y-1">
+                          <li>주요 명소 방문</li>
+                          <li>추천 맛집</li>
+                          <li>이동 및 휴식</li>
+                        </ul>
+                        <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                          <div>예상 이동시간: {transportEstimate.estimatedMinutes}분</div>
+                          <div>예상 교통비: {transportEstimate.estimatedCost.toLocaleString()}원</div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -384,6 +647,9 @@ const TripPlanPage = () => {
                   <li>교통: {(budget * 0.2).toLocaleString()}원</li>
                   <li>체험: {(budget * 0.1).toLocaleString()}원</li>
                 </ul>
+                <div className="mt-3 text-xs text-gray-500">
+                  * 교통수단 변경 시 실시간 재계산 (플레이스홀더)
+                </div>
               </div>
 
               <div className="bg-white p-6 rounded-lg shadow-md">
@@ -408,10 +674,22 @@ const TripPlanPage = () => {
 };
 
 export default TripPlanPage;
-// 달력: 이전/다음 달 이동 버튼 추가, 다른 달 선택 가능
-// 여행지: 입력 시 자동완성 드롭다운(로컬 제안) 표시
-// 예산: 슬라이더 → 숫자 입력으로 변경, 천단위 표기 유지
-// 자동완성 데이터 확장(서버/서드파티 API 연동)
-// 달력 라이브러리(react-date-range 등)로 다중월/범위 선택 강화
-// 예산 유효성, 통화 포맷 옵션
-// API/예약 연동은 이후 단계에서 붙이겠습니다.
+/*
+=== 변경 요약 (Final Ver. 4.0) ===
+1. STEP0 추가: 예약/교통 정보 입력 (해외여행/국내여행/숙소 예약)
+2. Day별 교통수단 선택 및 시뮬레이션 (도보/대중교통/택시/렌터카)
+3. 달력/시작일 동기화 (arrivalDateTime → startDate 자동 설정)
+4. localStorage 저장/복원 (페이지 새로고침 시 데이터 유지)
+5. Step 인디케이터 4단계로 확장 (0~3)
+6. 교통수단 변경 시 예상 시간/비용 실시간 계산
+
+=== 플레이스홀더 함수 위치 ===
+- estimateTravelTimeAndCost(): 실제 Directions API로 교체 필요
+- AI 일정 생성: arrivalLocation + arrivalDateTime 인자 사용하도록 수정 필요
+- 예산 재계산: 교통수단 변경 시 budget 교통 항목 자동 갱신 필요
+
+=== 다음 단계 (외부 연동) ===
+- Google Maps API: Directions API로 실제 교통시간/비용 계산
+- AI 서버: 출발점 정보를 반영한 일정 생성 API
+- 예약 연동: 항공/숙소 예약 시스템 연동
+*/

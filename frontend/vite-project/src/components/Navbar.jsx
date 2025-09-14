@@ -17,12 +17,12 @@ const Navbar = ({ onOpenModal }) => {
         <div className="flex justify-between items-center h-24">
           {/* 로고 영역 */}
           <div className="flex items-center">
-            <div className="flex-shrink-0 flex items-center space-x-3">
+            <Link to="/" className="flex-shrink-0 flex items-center space-x-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="스마트 여행 플래너" className="h-10 sm:h-11 md:h-12 w-auto object-contain" />
               <h1 className="text-2xl font-bold text-blue-600">
                 스마트 여행 플래너
               </h1>
-            </div>
+            </Link>
           </div>
           
           {/* 링크 및 버튼 영역 */}
