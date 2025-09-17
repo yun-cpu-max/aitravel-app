@@ -1,8 +1,31 @@
+/**
+ * HowItWorksModal 컴포넌트
+ * - 애플리케이션의 이용 방법을 설명하는 모달
+ * - 4단계의 사용 과정을 시각적으로 표시
+ * - 오버레이 배경과 함께 전체 화면을 덮는 모달 형태
+ */
+
+// React 기본 import
 import React from 'react';
 
+/**
+ * HowItWorksModal 컴포넌트
+ * - 이용 방법을 단계별로 설명하는 모달
+ * - 조건부 렌더링으로 열림/닫힘 상태를 관리
+ * 
+ * @param {Object} props - 컴포넌트 props
+ * @param {boolean} props.isOpen - 모달 열림/닫힘 상태
+ * @param {Function} props.onClose - 모달을 닫는 함수
+ * @returns {JSX.Element|null} 렌더링된 HowItWorksModal 컴포넌트 또는 null
+ */
 const HowItWorksModal = ({ isOpen, onClose }) => {
+  // 모달이 열려있지 않으면 아무것도 렌더링하지 않음
   if (!isOpen) return null;
 
+  /**
+   * 이용 방법의 4단계 데이터
+   * - 각 단계는 번호, 제목, 설명을 포함
+   */
   const steps = [
     { step: '1', title: '여행 정보 입력', description: '가고 싶은 도시, 날짜, 취향 등을 알려주세요.' },
     { step: '2', title: 'AI가 일정 생성', description: 'AI가 실시간으로 최적의 여행 계획을 만들어줍니다.' },

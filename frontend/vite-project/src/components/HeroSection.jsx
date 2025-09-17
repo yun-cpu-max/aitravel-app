@@ -1,9 +1,31 @@
+/**
+ * HeroSection 컴포넌트
+ * - 홈페이지의 메인 히어로 섹션
+ * - 애플리케이션의 주요 메시지와 CTA 버튼을 표시
+ * - 동영상 배경과 함께 시각적으로 매력적인 섹션
+ */
+
+// React 기본 import
 import React from 'react';
+
+// React Router DOM import (라우팅 관련)
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * HeroSection 컴포넌트
+ * - 홈페이지의 메인 섹션을 렌더링
+ * - 사용자에게 서비스의 가치를 전달하고 여행 계획 페이지로 유도
+ * 
+ * @returns {JSX.Element} 렌더링된 HeroSection 컴포넌트
+ */
 const HeroSection = () => {
+  // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
 
+  /**
+   * 여행 계획 시작 버튼 클릭 핸들러
+   * - 여행 계획 페이지로 이동
+   */
   const handleStartPlan = () => {
     navigate('/trip-plan');
   };

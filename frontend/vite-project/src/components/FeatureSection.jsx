@@ -1,8 +1,28 @@
+/**
+ * FeatureSection 컴포넌트
+ * - 애플리케이션의 주요 기능들을 소개하는 섹션
+ * - 캐러셀 형태로 여러 기능을 순환하며 표시
+ * - 사용자가 직접 이전/다음 버튼으로 탐색 가능
+ */
+
+// React 기본 훅 import
 import React, { useState } from 'react';
 
+/**
+ * FeatureSection 컴포넌트
+ * - 주요 기능들을 캐러셀 형태로 표시
+ * - 사용자가 이전/다음 버튼으로 기능을 탐색할 수 있음
+ * 
+ * @returns {JSX.Element} 렌더링된 FeatureSection 컴포넌트
+ */
 const FeatureSection = () => {
+  // 현재 표시 중인 기능의 인덱스를 관리하는 state
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  /**
+   * 표시할 주요 기능들의 데이터 배열
+   * - 각 기능은 제목과 설명을 포함
+   */
   const features = [
     {
       title: 'AI 맞춤형 일정 생성',
@@ -30,10 +50,18 @@ const FeatureSection = () => {
     },
   ];
 
+  /**
+   * 다음 기능으로 이동하는 핸들러
+   * - 마지막 기능에서 첫 번째 기능으로 순환
+   */
   const handleNext = () => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % features.length);
   };
 
+  /**
+   * 이전 기능으로 이동하는 핸들러
+   * - 첫 번째 기능에서 마지막 기능으로 순환
+   */
   const handlePrev = () => {
     setCurrentIndex((prevIndex) => (prevIndex - 1 + features.length) % features.length);
   };

@@ -1,11 +1,37 @@
+/**
+ * ProfilePage 컴포넌트
+ * - 사용자 프로필 관리 페이지
+ * - 사용자 정보 표시 및 여행 취향 설정 기능 제공
+ * - 로그인하지 않은 사용자는 로그인 페이지로 리다이렉트
+ */
+
+// React 기본 훅들 import
 import React, { useState, useEffect } from 'react';
+
+// React Router DOM import (라우팅 관련)
 import { useNavigate } from 'react-router-dom';
+
+// 인증 관련 커스텀 훅 import
 import { useAuth } from '../hooks/useAuth';
 
+/**
+ * ProfilePage 컴포넌트
+ * - 사용자의 프로필 정보와 여행 취향을 관리
+ * - 편집 모드와 보기 모드를 전환할 수 있음
+ * 
+ * @returns {JSX.Element} 렌더링된 ProfilePage 컴포넌트
+ */
 const ProfilePage = () => {
+  // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
+  
+  // 인증 관련 상태와 함수들을 가져옴
   const { user, updateTravelPreferences, logout } = useAuth();
+  
+  // 편집 모드 상태를 관리하는 state
   const [isEditing, setIsEditing] = useState(false);
+  
+  // 저장 중 상태를 관리하는 state
   const [isSaving, setIsSaving] = useState(false);
 
   const travelTypes = [

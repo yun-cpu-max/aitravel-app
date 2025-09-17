@@ -1,11 +1,39 @@
+/**
+ * Navbar 컴포넌트
+ * - 애플리케이션의 상단 네비게이션 바
+ * - 로고, 메뉴, 인증 상태에 따른 버튼들을 표시
+ * - 반응형 디자인으로 모바일과 데스크톱에서 모두 사용 가능
+ */
+
+// React 기본 import
 import React from 'react';
+
+// React Router DOM import (라우팅 관련)
 import { Link, useNavigate } from 'react-router-dom';
+
+// 인증 관련 커스텀 훅 import
 import { useAuth } from '../hooks/useAuth';
 
+/**
+ * Navbar 컴포넌트
+ * - 상단 네비게이션 바를 렌더링
+ * - 인증 상태에 따라 다른 메뉴를 표시
+ * 
+ * @param {Object} props - 컴포넌트 props
+ * @param {Function} props.onOpenModal - 모달을 여는 함수
+ * @returns {JSX.Element} 렌더링된 Navbar 컴포넌트
+ */
 const Navbar = ({ onOpenModal }) => {
+  // 인증 관련 상태와 함수들을 가져옴
   const { user, logout, isAuthenticated } = useAuth();
+  
+  // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
 
+  /**
+   * 로그아웃 처리 함수
+   * - 사용자를 로그아웃시키고 홈페이지로 이동
+   */
   const handleLogout = () => {
     logout();
     navigate('/');

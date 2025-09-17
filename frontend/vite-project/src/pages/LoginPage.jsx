@@ -1,12 +1,41 @@
+/**
+ * LoginPage 컴포넌트
+ * - 사용자 로그인 페이지
+ * - Google, Kakao, Naver 등 다양한 소셜 로그인 옵션 제공
+ * - 현재는 데모용으로 구현되어 있음 (실제 OAuth 연동 필요)
+ */
+
+// React 기본 훅 import
 import React, { useState } from 'react';
+
+// React Router DOM import (라우팅 관련)
 import { useNavigate } from 'react-router-dom';
+
+// 인증 관련 커스텀 훅 import
 import { useAuth } from '../hooks/useAuth';
 
+/**
+ * LoginPage 컴포넌트
+ * - 소셜 로그인 버튼들을 제공하는 로그인 페이지
+ * - 각 로그인 제공자별로 다른 처리 로직을 가짐
+ * 
+ * @returns {JSX.Element} 렌더링된 LoginPage 컴포넌트
+ */
 const LoginPage = () => {
+  // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
+  
+  // 인증 관련 함수들을 가져옴
   const { login } = useAuth();
+  
+  // 로딩 상태를 관리하는 state
   const [isLoading, setIsLoading] = useState(false);
 
+  /**
+   * Google 로그인 처리 함수
+   * - 현재는 데모용으로 2초 후 성공 처리
+   * - 실제 서비스에서는 Google OAuth API 호출 필요
+   */
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
@@ -30,6 +59,11 @@ const LoginPage = () => {
     }
   };
 
+  /**
+   * Kakao 로그인 처리 함수
+   * - 현재는 데모용으로 2초 후 성공 처리
+   * - 실제 서비스에서는 Kakao OAuth API 호출 필요
+   */
   const handleKakaoLogin = async () => {
     setIsLoading(true);
     try {

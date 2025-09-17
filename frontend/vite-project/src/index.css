@@ -1,3 +1,14 @@
+/**
+ * 전역 CSS 스타일 파일
+ * - Tailwind CSS의 기본 스타일을 import합니다.
+ * - 애플리케이션 전체에 적용되는 기본 스타일을 정의합니다.
+ */
+
+/* Tailwind CSS의 기본 스타일 (CSS Reset, 기본 요소 스타일 등) */
 @tailwind base;
+
+/* Tailwind CSS의 컴포넌트 클래스들 (버튼, 카드 등 재사용 가능한 스타일) */
 @tailwind components;
+
+/* Tailwind CSS의 유틸리티 클래스들 (margin, padding, color 등) */
 @tailwind utilities;

@@ -1,6 +1,23 @@
+/**
+ * TripPlanPage 컴포넌트
+ * - AI 여행 계획 생성의 메인 페이지
+ * - 하이브리드 UX: 폼 입력 + 챗봇 대화 + 결과 미리보기
+ * - 4단계로 구성: 예약/교통 정보 → 기본 정보 → 챗봇 조정 → 결과 미리보기
+ */
+
+// React 기본 훅들 import
 import React, { useState, useEffect } from 'react';
+
+// React Router DOM import (라우팅 관련)
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * TripPlanPage 컴포넌트
+ * - AI 여행 계획 생성의 전체 프로세스를 관리
+ * - 사용자 입력을 받아 AI가 맞춤형 여행 계획을 생성
+ * 
+ * @returns {JSX.Element} 렌더링된 TripPlanPage 컴포넌트
+ */
 const TripPlanPage = () => {
   // STEP0: 예약/교통 정보 입력 (선행 단계)
   const [step, setStep] = useState(0); // 0: 예약/출발 정보, 1: 기본 폼, 2: 챗봇, 3: 결과
@@ -410,15 +427,15 @@ const TripPlanPage = () => {
         <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-2xl mx-auto text-left">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2 relative">
-              <input
-                type="text"
-                placeholder="여행지를 입력해주세요 (예: 파리)"
-                value={destination}
+          <input
+            type="text"
+            placeholder="여행지를 입력해주세요 (예: 파리)"
+            value={destination}
                 onChange={(e) => { setDestination(e.target.value); setShowSuggestions(true); }}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 100)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
-              />
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors"
+          />
               {showSuggestions && filteredDestinations.length > 0 && (
                 <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
                   {filteredDestinations.map((item) => (
@@ -435,21 +452,21 @@ const TripPlanPage = () => {
             </div>
 
             <div className="relative md:col-span-2">
-              <input
-                type="text"
-                placeholder="여행 날짜를 선택해주세요"
-                value={date}
-                readOnly
-                onClick={() => setIsCalendarOpen(true)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors cursor-pointer"
-              />
-              <button
-                onClick={() => setIsCalendarOpen(true)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h.01M16 14h.01M12 14h.01M16 18h.01M12 18h.01M16 22h.01M12 22h.01M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-              </button>
-            </div>
+            <input
+              type="text"
+              placeholder="여행 날짜를 선택해주세요"
+              value={date}
+              readOnly
+              onClick={() => setIsCalendarOpen(true)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition-colors cursor-pointer"
+            />
+            <button
+              onClick={() => setIsCalendarOpen(true)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h.01M16 14h.01M12 14h.01M16 18h.01M12 18h.01M16 22h.01M12 22h.01M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            </button>
+          </div>
 
             <div>
               <label className="block text-sm text-gray-600 mb-1">성인</label>
@@ -485,12 +502,12 @@ const TripPlanPage = () => {
               />
               <div className="text-right text-sm text-gray-700 mt-1">{budget.toLocaleString()}원</div>
             </div>
-          </div>
+        </div>
 
-          {isCalendarOpen && (
-            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-              <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
-                <div className="flex justify-between items-center mb-4">
+        {isCalendarOpen && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+              <div className="flex justify-between items-center mb-4">
                   <div className="flex items-center gap-2">
                     <button onClick={handlePrevMonth} className="p-2 rounded hover:bg-gray-100" aria-label="previous month">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"/></svg>
@@ -500,31 +517,31 @@ const TripPlanPage = () => {
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
                     </button>
                   </div>
-                  <button onClick={() => setIsCalendarOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                  </button>
-                </div>
-                {renderCalendar()}
-                <div className="flex justify-end mt-4">
-                  <button
-                    onClick={handleApplyDates}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-                  >
-                    선택 완료
-                  </button>
-                </div>
+                <button onClick={() => setIsCalendarOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+              </div>
+              {renderCalendar()}
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={handleApplyDates}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                  선택 완료
+                </button>
               </div>
             </div>
-          )}
+          </div>
+        )}
 
           <div className="flex justify-end mt-6">
-            <button
+        <button
               onClick={handleNextFromForm}
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
-            >
+        >
               다음 (챗봇으로 세부 조정)
-            </button>
-          </div>
+        </button>
+      </div>
         </div>
       )}
 
