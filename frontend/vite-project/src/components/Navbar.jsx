@@ -59,7 +59,7 @@ const Navbar = ({ onOpenModal }) => {
               {/* 이용 방법 버튼 */}
               <button
                 onClick={onOpenModal}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
               >
                 이용 방법
               </button>
@@ -67,7 +67,7 @@ const Navbar = ({ onOpenModal }) => {
               {/* 여행 계획하기 버튼 */}
               <Link
                 to="/trip-plan"
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
               >
                 여행 계획하기
               </Link>
@@ -89,6 +89,12 @@ const Navbar = ({ onOpenModal }) => {
                     {/* 드롭다운 메뉴 */}
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                       <Link
+                        to="/dashboard"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        나의 여행 대시보드
+                      </Link>
+                      <Link
                         to="/profile"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
@@ -107,16 +113,16 @@ const Navbar = ({ onOpenModal }) => {
                 <>
                   <Link
                     to="/login"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                    className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
                   >
                     로그인
                   </Link>
-                  <Link
+                  {/* <Link
                     to="/login"
                     className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-all duration-200 text-sm"
                   >
                     시작하기
-                  </Link>
+                  </Link> */}
                 </>
               )}
             </div>

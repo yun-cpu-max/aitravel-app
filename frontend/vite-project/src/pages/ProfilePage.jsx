@@ -1,8 +1,9 @@
 /**
  * ProfilePage 컴포넌트
  * - 사용자 프로필 관리 페이지
- * - 사용자 정보 표시 및 여행 취향 설정 기능 제공
- * - 로그인하지 않은 사용자는 로그인 페이지로 리다이렉트
+ * - 사용자 기본 정보 및 여행 취향 설정 기능 제공
+ * - 백엔드 User, UserPreferences 엔티티와 연동
+ * - 프로필 사진 업로드, 개인정보 수정, 여행 취향 설정 기능
  */
 
 // React 기본 훅들 import
@@ -33,78 +34,215 @@ const ProfilePage = () => {
   
   // 저장 중 상태를 관리하는 state
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 사용자 기본 정보 상태 관리
+  const [userInfo, setUserInfo] = useState({
+    name: '',
+    email: '',
+    profileImageUrl: ''
+  });
+  
+  // 여행 취향 상태 관리 (백엔드 UserPreferences 엔티티 기반)
+  const [travelPreferences, setTravelPreferences] = useState({
+    travelStyle: '',
+    budgetRangeMin: '',
+    budgetRangeMax: '',
+    preferredAccommodationType: '',
+    preferredTransportation: ''
+  });
+  
+  // 프로필 사진 업로드 상태 관리
+  const [profileImage, setProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState(null);
 
-  const travelTypes = [
-    { value: 'relaxation', label: '휴양형', description: '편안하고 여유로운 여행' },
-    { value: 'activity', label: '액티비티형', description: '다양한 활동과 체험' },
-    { value: 'culture', label: '문화탐방형', description: '역사와 문화를 탐방' },
-    { value: 'nature', label: '자연탐방형', description: '자연과 풍경을 즐기는 여행' }
+  // 백엔드 UserPreferences 엔티티 기반 여행 스타일 옵션
+  const travelStyleOptions = [
+    { value: '휴양', label: '휴양형', description: '편안하고 여유로운 여행', icon: '🏖️' },
+    { value: '액티비티', label: '액티비티형', description: '다양한 활동과 체험', icon: '🏃‍♂️' },
+    { value: '문화', label: '문화탐방형', description: '역사와 문화를 탐방', icon: '🏛️' },
+    { value: '미식', label: '미식여행형', description: '맛집과 음식을 중심으로', icon: '🍽️' }
   ];
 
-  const budgetOptions = [
-    { value: 'low', label: '저예산', description: '50만원 이하' },
-    { value: 'medium', label: '중간', description: '50-100만원' },
-    { value: 'high', label: '고급', description: '100만원 이상' }
+  // 예산 범위 옵션 (백엔드 budget_range_min/max와 연동)
+  const budgetRangeOptions = [
+    { value: '0-500000', label: '50만원 이하', min: 0, max: 500000 },
+    { value: '500000-1000000', label: '50-100만원', min: 500000, max: 1000000 },
+    { value: '1000000-2000000', label: '100-200만원', min: 1000000, max: 2000000 },
+    { value: '2000000-5000000', label: '200-500만원', min: 2000000, max: 5000000 },
+    { value: '5000000+', label: '500만원 이상', min: 5000000, max: null }
   ];
 
-  const durationOptions = [
-    { value: '1-2', label: '1-2일', description: '당일치기, 1박2일' },
-    { value: '3-4', label: '3-4일', description: '2박3일, 3박4일' },
-    { value: '5-7', label: '5-7일', description: '4박5일, 5박6일' },
-    { value: '7+', label: '1주일 이상', description: '장기 여행' }
+  // 선호 숙소 타입 옵션
+  const accommodationOptions = [
+    { value: '호텔', label: '호텔', description: '편안하고 안전한 숙박', icon: '🏨' },
+    { value: '게스트하우스', label: '게스트하우스', description: '경제적이고 친근한 분위기', icon: '🏠' },
+    { value: '에어비앤비', label: '에어비앤비', description: '현지인처럼 생활하기', icon: '🏡' },
+    { value: '펜션', label: '펜션', description: '자연 속에서 휴식', icon: '🌲' },
+    { value: '리조트', label: '리조트', description: '고급스러운 휴양', icon: '🏖️' },
+    { value: '호스텔', label: '호스텔', description: '경제적이고 사회적인', icon: '🛏️' }
   ];
 
-  const companionOptions = [
-    { value: 'solo', label: '혼자' },
-    { value: 'couple', label: '커플' },
-    { value: 'family', label: '가족' },
-    { value: 'friends', label: '친구' },
-    { value: 'colleagues', label: '동료' }
+  // 선호 교통수단 옵션
+  const transportationOptions = [
+    { value: '대중교통', label: '대중교통', description: '지하철, 버스 등', icon: '🚇' },
+    { value: '렌터카', label: '렌터카', description: '자유로운 이동', icon: '🚗' },
+    { value: '도보', label: '도보', description: '걸어서 탐방', icon: '🚶‍♂️' },
+    { value: '자전거', label: '자전거', description: '친환경적 이동', icon: '🚴‍♂️' },
+    { value: '택시', label: '택시', description: '편리한 이동', icon: '🚕' },
+    { value: '기타', label: '기타', description: '기타 교통수단', icon: '🚌' }
   ];
 
-  const interestOptions = [
-    { value: 'sightseeing', label: '관광' },
-    { value: 'shopping', label: '쇼핑' },
-    { value: 'food', label: '맛집' },
-    { value: 'activity', label: '액티비티' },
-    { value: 'healing', label: '힐링' },
-    { value: 'culture', label: '문화' }
-  ];
-
+  // 사용자 정보 초기화
   useEffect(() => {
-    // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
-    if (!user) {
+    if (user) {
+      setUserInfo({
+        name: user.name || '',
+        email: user.email || '',
+        profileImageUrl: user.profileImageUrl || ''
+      });
+      
+      // 여행 취향 정보 초기화 (백엔드 UserPreferences 엔티티 기반)
+      setTravelPreferences({
+        travelStyle: user.travelPreferences?.travelStyle || '',
+        budgetRangeMin: user.travelPreferences?.budgetRangeMin || '',
+        budgetRangeMax: user.travelPreferences?.budgetRangeMax || '',
+        preferredAccommodationType: user.travelPreferences?.preferredAccommodationType || '',
+        preferredTransportation: user.travelPreferences?.preferredTransportation || ''
+      });
+      
+      // 프로필 사진 미리보기 설정
+      if (user.profileImageUrl) {
+        setProfileImagePreview(user.profileImageUrl);
+      }
+    } else {
+      // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
       navigate('/login');
     }
   }, [user, navigate]);
 
-  const handlePreferenceChange = (category, value) => {
-    if (category === 'companions' || category === 'interests') {
-      const currentValues = user?.travelPreferences?.[category] || [];
-      const newValues = currentValues.includes(value)
-        ? currentValues.filter(item => item !== value)
-        : [...currentValues, value];
+  /**
+   * 사용자 기본 정보 변경 핸들러
+   * - 이름, 이메일 등 기본 정보를 업데이트
+   *
+   * @param {string} field - 변경할 필드명
+   * @param {string} value - 새로운 값
+   */
+  const handleUserInfoChange = (field, value) => {
+    setUserInfo(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  /**
+   * 여행 취향 변경 핸들러
+   * - 백엔드 UserPreferences 엔티티와 연동
+   *
+   * @param {string} field - 변경할 필드명
+   * @param {string} value - 새로운 값
+   */
+  const handleTravelPreferenceChange = (field, value) => {
+    setTravelPreferences(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  /**
+   * 예산 범위 변경 핸들러
+   * - budget_range_min/max를 개별적으로 설정
+   *
+   * @param {string} field - 'min' 또는 'max'
+   * @param {number} value - 예산 값
+   */
+  const handleBudgetRangeChange = (field, value) => {
+    setTravelPreferences(prev => ({
+      ...prev,
+      [`budgetRange${field.charAt(0).toUpperCase() + field.slice(1)}`]: value
+    }));
+  };
+
+  /**
+   * 프로필 사진 업로드 핸들러
+   * - 파일 선택 시 미리보기 설정
+   *
+   * @param {Event} event - 파일 입력 이벤트
+   */
+  const handleProfileImageChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setProfileImage(file);
       
-      updateTravelPreferences({ [category]: newValues });
-    } else {
-      updateTravelPreferences({ [category]: value });
+      // 미리보기 URL 생성
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfileImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
+  /**
+   * 프로필 사진 제거 핸들러
+   * - 선택된 프로필 사진을 제거
+   */
+  const handleRemoveProfileImage = () => {
+    setProfileImage(null);
+    setProfileImagePreview(null);
+  };
+
+  /**
+   * 프로필 저장 핸들러
+   * - 사용자 기본 정보와 여행 취향을 저장
+   * - 프로필 사진 업로드 처리
+   */
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // TODO: 실제 API 호출로 사용자 데이터 저장
+      // 1. 프로필 사진 업로드 (있는 경우)
+      if (profileImage) {
+        // TODO: 실제 파일 업로드 API 호출
+        // const formData = new FormData();
+        // formData.append('profileImage', profileImage);
+        // const uploadResponse = await fetch('/api/upload/profile-image', {
+        //   method: 'POST',
+        //   body: formData
+        // });
+        // const uploadResult = await uploadResponse.json();
+        // const profileImageUrl = uploadResult.url;
+        
+        // 임시로 로컬 URL 사용 (실제로는 업로드된 URL을 사용)
+        console.log('프로필 사진 업로드됨:', profileImagePreview);
+      }
+
+      // 2. 여행 취향 정보 업데이트
+      const updatedTravelPreferences = {
+        ...travelPreferences
+      };
+
+      // TODO: 실제 API 호출로 데이터 저장
+      // await fetch('/api/users/profile', {
+      //   method: 'PUT',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({
+      //     userInfo: updatedUserInfo,
+      //     travelPreferences: updatedTravelPreferences
+      //   })
+      // });
+
       // 현재는 Context에서 자동으로 localStorage에 저장됨
+      updateTravelPreferences(updatedTravelPreferences);
       
       // 임시로 1초 후 저장 완료
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
       setIsSaving(false);
       setIsEditing(false);
       alert('프로필이 저장되었습니다!');
     } catch (error) {
       console.error('프로필 저장 실패:', error);
       setIsSaving(false);
+      alert('프로필 저장에 실패했습니다. 다시 시도해주세요.');
     }
   };
 
@@ -115,7 +253,7 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* 헤더 */}
         <div className="bg-white shadow rounded-lg mb-8">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -125,7 +263,7 @@ const ProfilePage = () => {
                 {!isEditing ? (
                   <button
                     onClick={() => setIsEditing(true)}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
                   >
                     편집
                   </button>
@@ -140,7 +278,7 @@ const ProfilePage = () => {
                     <button
                       onClick={handleSave}
                       disabled={isSaving}
-                      className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                      className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                     >
                       {isSaving ? '저장 중...' : '저장'}
                     </button>
@@ -156,17 +294,88 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          {/* 기본 정보 */}
-          <div className="px-6 py-4">
-            <div className="flex items-center space-x-4">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
-                <span className="text-2xl font-bold text-indigo-600">
-                  {user?.name?.charAt(0) || 'U'}
-                </span>
+          {/* 기본 정보 섹션 */}
+          <div className="px-6 py-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">기본 정보</h2>
+            <div className="flex items-start space-x-6">
+              {/* 프로필 사진 */}
+              <div className="flex-shrink-0">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                    {profileImagePreview ? (
+                      <img
+                        src={profileImagePreview}
+                        alt="프로필 사진"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-3xl font-bold text-gray-400">
+                        {userInfo.name?.charAt(0) || 'U'}
+                      </span>
+                    )}
+                  </div>
+                  {isEditing && (
+                    <div className="absolute -bottom-2 -right-2">
+                      <label className="bg-blue-600 text-white p-2 rounded-full cursor-pointer hover:bg-blue-700 transition-colors">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProfileImageChange}
+                          className="hidden"
+                        />
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                      </label>
+                    </div>
+                  )}
+                  {isEditing && profileImagePreview && (
+                    <button
+                      onClick={handleRemoveProfileImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">{user?.name || '사용자'}</h2>
-                <p className="text-gray-600">{user?.email || 'user@example.com'}</p>
+
+              {/* 사용자 정보 입력 폼 */}
+              <div className="flex-1 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      이름
+                    </label>
+                    <input
+                      type="text"
+                      value={userInfo.name}
+                      onChange={(e) => handleUserInfoChange('name', e.target.value)}
+                      disabled={!isEditing}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      이메일
+                    </label>
+                    <input
+                      type="email"
+                      value={userInfo.email}
+                      onChange={(e) => handleUserInfoChange('email', e.target.value)}
+                      disabled={!isEditing}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    />
+                  </div>
+                </div>
+                
+                {/* 계정 생성일 정보 (읽기 전용) */}
+                <div className="text-sm text-gray-500">
+                  <p>계정 생성일: {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '정보 없음'}</p>
+                  <p>마지막 수정일: {user?.updatedAt ? new Date(user.updatedAt).toLocaleDateString('ko-KR') : '정보 없음'}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -182,158 +391,180 @@ const ProfilePage = () => {
           </div>
 
           <div className="px-6 py-6 space-y-8">
-            {/* 여행 유형 */}
+            {/* 여행 스타일 (백엔드 UserPreferences.travel_style) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                여행 유형
+                여행 스타일
               </label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {travelTypes.map((type) => (
+                {travelStyleOptions.map((style) => (
                   <label
-                    key={type.value}
+                    key={style.value}
                     className={`relative flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
-                      user?.travelPreferences?.type === type.value
-                        ? 'border-indigo-500 bg-indigo-50'
+                      travelPreferences.travelStyle === style.value
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400'
                     } ${!isEditing ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     <input
                       type="radio"
-                      name="travelType"
-                      value={type.value}
-                      checked={user?.travelPreferences?.type === type.value}
-                      onChange={(e) => handlePreferenceChange('type', e.target.value)}
+                      name="travelStyle"
+                      value={style.value}
+                      checked={travelPreferences.travelStyle === style.value}
+                      onChange={(e) => handleTravelPreferenceChange('travelStyle', e.target.value)}
                       disabled={!isEditing}
                       className="sr-only"
                     />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{type.label}</div>
-                      <div className="text-sm text-gray-600">{type.description}</div>
+                    <div className="flex items-start space-x-3">
+                      <span className="text-2xl">{style.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{style.label}</div>
+                        <div className="text-sm text-gray-600">{style.description}</div>
+                      </div>
                     </div>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* 예산 */}
+            {/* 예산 범위 (백엔드 UserPreferences.budget_range_min/max) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                예산
+                선호 예산 범위
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {budgetOptions.map((budget) => (
+              <div className="space-y-4">
+                {/* 예산 범위 선택 */}
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {budgetRangeOptions.map((range) => (
+                    <label
+                      key={range.value}
+                      className={`relative flex flex-col items-center p-4 border rounded-lg cursor-pointer transition-colors ${
+                        travelPreferences.budgetRangeMin === range.min && 
+                        travelPreferences.budgetRangeMax === range.max
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      } ${!isEditing ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <input
+                        type="radio"
+                        name="budgetRange"
+                        value={range.value}
+                        checked={travelPreferences.budgetRangeMin === range.min && 
+                                travelPreferences.budgetRangeMax === range.max}
+                        onChange={() => {
+                          handleBudgetRangeChange('min', range.min);
+                          handleBudgetRangeChange('max', range.max);
+                        }}
+                        disabled={!isEditing}
+                        className="sr-only"
+                      />
+                      <div className="font-medium text-gray-900 text-center">{range.label}</div>
+                    </label>
+                  ))}
+                </div>
+                
+                {/* 커스텀 예산 범위 입력 */}
+                {isEditing && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-3">또는 직접 입력하세요</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          최소 예산 (원)
+                        </label>
+                        <input
+                          type="number"
+                          value={travelPreferences.budgetRangeMin || ''}
+                          onChange={(e) => handleBudgetRangeChange('min', parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          최대 예산 (원)
+                        </label>
+                        <input
+                          type="number"
+                          value={travelPreferences.budgetRangeMax || ''}
+                          onChange={(e) => handleBudgetRangeChange('max', parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="1000000"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 선호 숙소 타입 (백엔드 UserPreferences.preferred_accommodation_type) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                선호 숙소 타입
+              </label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {accommodationOptions.map((accommodation) => (
                   <label
-                    key={budget.value}
+                    key={accommodation.value}
                     className={`relative flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
-                      user?.travelPreferences?.budget === budget.value
-                        ? 'border-indigo-500 bg-indigo-50'
+                      travelPreferences.preferredAccommodationType === accommodation.value
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400'
                     } ${!isEditing ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     <input
                       type="radio"
-                      name="budget"
-                      value={budget.value}
-                      checked={user?.travelPreferences?.budget === budget.value}
-                      onChange={(e) => handlePreferenceChange('budget', e.target.value)}
+                      name="accommodationType"
+                      value={accommodation.value}
+                      checked={travelPreferences.preferredAccommodationType === accommodation.value}
+                      onChange={(e) => handleTravelPreferenceChange('preferredAccommodationType', e.target.value)}
                       disabled={!isEditing}
                       className="sr-only"
                     />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{budget.label}</div>
-                      <div className="text-sm text-gray-600">{budget.description}</div>
+                    <div className="flex items-start space-x-3">
+                      <span className="text-2xl">{accommodation.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{accommodation.label}</div>
+                        <div className="text-sm text-gray-600">{accommodation.description}</div>
+                      </div>
                     </div>
                   </label>
                 ))}
               </div>
             </div>
 
-            {/* 여행 기간 */}
+            {/* 선호 교통수단 (백엔드 UserPreferences.preferred_transportation) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
-                여행 기간
+                선호 교통수단
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {durationOptions.map((duration) => (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {transportationOptions.map((transportation) => (
                   <label
-                    key={duration.value}
+                    key={transportation.value}
                     className={`relative flex items-start p-4 border rounded-lg cursor-pointer transition-colors ${
-                      user?.travelPreferences?.duration === duration.value
-                        ? 'border-indigo-500 bg-indigo-50'
+                      travelPreferences.preferredTransportation === transportation.value
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-300 hover:border-gray-400'
                     } ${!isEditing ? 'cursor-not-allowed opacity-50' : ''}`}
                   >
                     <input
                       type="radio"
-                      name="duration"
-                      value={duration.value}
-                      checked={user?.travelPreferences?.duration === duration.value}
-                      onChange={(e) => handlePreferenceChange('duration', e.target.value)}
+                      name="transportation"
+                      value={transportation.value}
+                      checked={travelPreferences.preferredTransportation === transportation.value}
+                      onChange={(e) => handleTravelPreferenceChange('preferredTransportation', e.target.value)}
                       disabled={!isEditing}
                       className="sr-only"
                     />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{duration.label}</div>
-                      <div className="text-sm text-gray-600">{duration.description}</div>
+                    <div className="flex items-start space-x-3">
+                      <span className="text-2xl">{transportation.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{transportation.label}</div>
+                        <div className="text-sm text-gray-600">{transportation.description}</div>
+                      </div>
                     </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* 동행자 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                동행자 (복수 선택 가능)
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                {companionOptions.map((companion) => (
-                  <label
-                    key={companion.value}
-                    className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                      user?.travelPreferences?.companions?.includes(companion.value)
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                        : 'border-gray-300 hover:border-gray-400'
-                    } ${!isEditing ? 'cursor-not-allowed opacity-50' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      value={companion.value}
-                      checked={user?.travelPreferences?.companions?.includes(companion.value)}
-                      onChange={(e) => handlePreferenceChange('companions', e.target.value)}
-                      disabled={!isEditing}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-medium">{companion.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* 관심사 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                관심사 (복수 선택 가능)
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {interestOptions.map((interest) => (
-                  <label
-                    key={interest.value}
-                    className={`relative flex items-center justify-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                      user?.travelPreferences?.interests?.includes(interest.value)
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                        : 'border-gray-300 hover:border-gray-400'
-                    } ${!isEditing ? 'cursor-not-allowed opacity-50' : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      value={interest.value}
-                      checked={user?.travelPreferences?.interests?.includes(interest.value)}
-                      onChange={(e) => handlePreferenceChange('interests', e.target.value)}
-                      disabled={!isEditing}
-                      className="sr-only"
-                    />
-                    <span className="text-sm font-medium">{interest.label}</span>
                   </label>
                 ))}
               </div>
@@ -341,13 +572,19 @@ const ProfilePage = () => {
           </div>
         </div>
 
-        {/* 여행 계획하기 버튼 */}
-        <div className="mt-8 text-center">
+        {/* 액션 버튼들 */}
+        <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
           <button
             onClick={() => navigate('/trip-plan')}
-            className="bg-indigo-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-indigo-700 transition-colors"
+            className="bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-blue-700 transition-colors"
           >
             맞춤형 여행 계획하기
+          </button>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="bg-gray-600 text-white px-8 py-3 rounded-lg text-lg font-medium hover:bg-gray-700 transition-colors"
+          >
+            나의 여행 대시보드
           </button>
         </div>
       </div>

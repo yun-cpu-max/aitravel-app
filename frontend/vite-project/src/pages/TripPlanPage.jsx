@@ -6,7 +6,7 @@
  */
 
 // React 기본 훅들 import
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 // React Router DOM import (라우팅 관련)
 import { useNavigate } from 'react-router-dom';
@@ -62,6 +62,11 @@ const TripPlanPage = () => {
     ? destinationOptions.filter((d) => d.toLowerCase().includes(destination.toLowerCase())).slice(0, 8)
     : destinationOptions.slice(0, 8);
 
+  // 페이지 이탈 방지 관련 상태
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const isInitialized = useRef(false);
+
   const navigate = useNavigate();
 
   // localStorage 저장/복원
@@ -82,27 +87,162 @@ const TripPlanPage = () => {
       setBudget(data.budget || 1500000);
       setChatMessages(data.chatMessages || [{ role: 'assistant', content: '여행 스타일은 어떤 편이세요? (휴양/액티비티/문화 탐방/미식 등)' }]);
       setTransportByDay(data.transportByDay || []);
+      
+    // 저장된 데이터가 있으면 변경사항이 있다고 표시 (실제 입력이 있을 때만)
+    const hasStoredData = data.destination || data.date || data.startDate || data.endDate || 
+                          data.flightInfo?.arrivalAirport || data.flightInfo?.arrivalDateTime || 
+                          data.startLocation || (data.chatMessages && data.chatMessages.length > 1);
+    setHasUnsavedChanges(hasStoredData);
     }
+    isInitialized.current = true;
   }, []);
 
-  // 데이터 저장
-  const saveToLocalStorage = () => {
-    const data = {
-      step,
-      travelStartType,
-      flightInfo,
-      startLocation,
-      destination,
-      date,
-      startDate: startDate?.toISOString(),
-      endDate: endDate?.toISOString(),
-      numAdults,
-      numChildren,
-      budget,
-      chatMessages,
-      transportByDay
+  // 변경사항 감지 및 저장
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    
+    // 사용자가 실제로 입력을 시작했는지 확인 (더 엄격한 조건)
+    const hasInput = (destination && destination.trim() !== '') || 
+                    (date && date.trim() !== '') || 
+                    startDate || endDate || 
+                    (flightInfo.arrivalAirport && flightInfo.arrivalAirport.trim() !== '') || 
+                    (flightInfo.arrivalDateTime && flightInfo.arrivalDateTime.trim() !== '') || 
+                    (startLocation && startLocation.trim() !== '') || 
+                    chatMessages.length > 1 ||
+                    step > 0 || 
+                    numAdults > 1 || 
+                    numChildren > 0 || 
+                    budget > 1500000;
+    
+    setHasUnsavedChanges(hasInput);
+    
+    if (hasInput) {
+      // 데이터 저장
+      const data = {
+        step,
+        travelStartType,
+        flightInfo,
+        startLocation,
+        destination,
+        date,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+        numAdults,
+        numChildren,
+        budget,
+        chatMessages,
+        transportByDay
+      };
+      localStorage.setItem('tripPlanData', JSON.stringify(data));
+    }
+  }, [destination, date, startDate, endDate, flightInfo, startLocation, chatMessages, transportByDay, step, travelStartType, numAdults, numChildren, budget]);
+
+  // 페이지 이탈 방지 (브라우저 새로고침, 탭 닫기 등)
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '작성 중인 여행 계획이 있습니다. 페이지를 나가시면 작성한 내용이 초기화됩니다. 정말 나가시겠습니까?';
+        return e.returnValue;
+      }
     };
-    localStorage.setItem('tripPlanData', JSON.stringify(data));
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // 네비게이션 차단을 위한 커스텀 이벤트 리스너
+  useEffect(() => {
+    const handleLinkClick = (e) => {
+      // 폼 내부 요소들은 차단하지 않음
+      if (e.target.closest('form') || 
+          e.target.closest('[role="button"]') ||
+          e.target.type === 'radio' ||
+          e.target.type === 'checkbox' ||
+          e.target.type === 'text' ||
+          e.target.type === 'email' ||
+          e.target.type === 'number' ||
+          e.target.type === 'date' ||
+          e.target.type === 'time' ||
+          e.target.tagName === 'BUTTON' ||
+          e.target.closest('button')) {
+        return;
+      }
+
+      // 네비게이션 링크만 차단
+      const link = e.target.closest('a');
+      if (link && hasUnsavedChanges) {
+        e.preventDefault();
+        setShowExitConfirm(true);
+        // 클릭된 링크의 href를 저장하여 나중에 이동할 수 있도록 함
+        window.pendingNavigation = link.href;
+      }
+    };
+
+    // 모든 클릭에 이벤트 리스너 추가
+    document.addEventListener('click', handleLinkClick);
+    return () => document.removeEventListener('click', handleLinkClick);
+  }, [hasUnsavedChanges]);
+
+  // 브라우저 뒤로가기/앞으로가기 차단
+  useEffect(() => {
+    const handlePopState = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        setShowExitConfirm(true);
+        // 브라우저 히스토리에 다시 추가하여 뒤로가기 방지
+        window.history.pushState(null, '', window.location.href);
+        // 대기 중인 네비게이션을 뒤로가기로 설정
+        window.pendingNavigation = 'back';
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [hasUnsavedChanges]);
+
+
+  // 데이터 초기화 함수
+  const clearTripData = () => {
+    localStorage.removeItem('tripPlanData');
+    setStep(0);
+    setTravelStartType('flight');
+    setFlightInfo({ arrivalAirport: '', arrivalDateTime: '', departureAirport: '', departureDateTime: '' });
+    setStartLocation('');
+    setDestination('');
+    setDate('');
+    setStartDate(null);
+    setEndDate(null);
+    setNumAdults(2);
+    setNumChildren(0);
+    setBudget(1500000);
+    setChatMessages([{ role: 'assistant', content: '여행 스타일은 어떤 편이세요? (휴양/액티비티/문화 탐방/미식 등)' }]);
+    setTransportByDay([]);
+    setHasUnsavedChanges(false);
+  };
+
+  // 페이지 이탈 확인 핸들러
+  const handleConfirmExit = () => {
+    clearTripData();
+    setShowExitConfirm(false);
+    
+    // 저장된 네비게이션 URL이 있으면 해당 페이지로 이동
+    if (window.pendingNavigation) {
+      if (window.pendingNavigation === 'back') {
+        // 뒤로가기인 경우
+        window.history.back();
+      } else {
+        // 특정 URL로 이동하는 경우
+        window.location.href = window.pendingNavigation;
+      }
+      window.pendingNavigation = null;
+    }
+  };
+
+  const handleCancelExit = () => {
+    setShowExitConfirm(false);
+    // 대기 중인 네비게이션 초기화
+    window.pendingNavigation = null;
   };
 
   // arrival 정보로 startDate 동기화
@@ -146,7 +286,6 @@ const TripPlanPage = () => {
       }
     }
     setStep(1);
-    saveToLocalStorage();
   };
 
   const handleNextFromForm = () => {
@@ -155,7 +294,6 @@ const TripPlanPage = () => {
       return;
     }
     setStep(2);
-    saveToLocalStorage();
   };
 
   const handlePrev = () => {
@@ -164,7 +302,6 @@ const TripPlanPage = () => {
 
   const handleNextFromChat = () => {
     setStep(3);
-    saveToLocalStorage();
   };
 
   const handleConfirmPlan = () => {
@@ -201,7 +338,6 @@ const TripPlanPage = () => {
       const formattedEndDate = `${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')}`;
       setDate(`${formattedStartDate} ~ ${formattedEndDate}`);
       setIsCalendarOpen(false);
-      saveToLocalStorage();
     }
   };
 
@@ -214,7 +350,6 @@ const TripPlanPage = () => {
       newTransportByDay[dayIndex].defaultMode = mode;
     }
     setTransportByDay(newTransportByDay);
-    saveToLocalStorage();
   };
 
   const handlePrevMonth = () => {
@@ -279,13 +414,50 @@ const TripPlanPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16 text-center">
-      <h1 className="text-4xl font-bold text-gray-800 mb-4">
-        여행 계획 시작하기
-      </h1>
-      <p className="text-lg text-gray-600 mb-8">
-        폼으로 뼈대를 만들고, 챗봇으로 살을 붙여 보세요.
-      </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* 페이지 이탈 확인 모달 */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0 w-10 h-10 mx-auto bg-yellow-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              작성 중인 내용이 있습니다
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              페이지를 나가시면 작성한 여행 계획 내용이 초기화됩니다.<br/>
+              정말 나가시겠습니까?
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={handleCancelExit}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleConfirmExit}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                나가기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 py-16 text-center">
+        <h1 className="text-4xl font-bold text-gray-800 mb-4">
+          여행 계획 시작하기
+        </h1>
+        <p className="text-lg text-gray-600 mb-8">
+          폼으로 뼈대를 만들고, 챗봇으로 살을 붙여 보세요.
+        </p>
 
       {/* Step Indicator */}
       <div className="flex items-center justify-center gap-2 mb-6">
@@ -686,6 +858,7 @@ const TripPlanPage = () => {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

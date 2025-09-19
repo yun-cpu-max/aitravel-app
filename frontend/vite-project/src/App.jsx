@@ -25,6 +25,7 @@ import Footer from './components/Footer';
 import TripPlanPage from './pages/TripPlanPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
+import DashboardPage from './pages/DashboardPage';
 
 /**
  * App 컴포넌트
@@ -69,25 +70,27 @@ function App() {
           
           {/* 메인 콘텐츠 영역 (flex-grow로 남은 공간 모두 차지) */}
           <main className="flex-grow">
-            {/* 라우트 정의 */}
-            <Routes>
-              {/* 홈 페이지 라우트 */}
-              <Route
-                path="/"
-                element={
-                  <>
-                    <HeroSection />
-                    <FeatureSection />
-                  </>
-                }
-              />
-              {/* 로그인 페이지 라우트 */}
-              <Route path="/login" element={<LoginPage />} />
-              {/* 프로필 페이지 라우트 */}
-              <Route path="/profile" element={<ProfilePage />} />
-              {/* 여행 계획 페이지 라우트 */}
-              <Route path="/trip-plan" element={<TripPlanPage />} />
-            </Routes>
+                {/* 라우트 정의 */}
+                <Routes>
+                  {/* 홈 페이지 라우트 */}
+                  <Route
+                    path="/"
+                    element={
+                      <>
+                        <HeroSection />
+                        <FeatureSection />
+                      </>
+                    }
+                  />
+                  {/* 로그인 페이지 라우트 */}
+                  <Route path="/login" element={<LoginPage />} />
+                  {/* 프로필 페이지 라우트 */}
+                  <Route path="/profile" element={<ProfilePage />} />
+                  {/* 여행 계획 페이지 라우트 */}
+                  <Route path="/trip-plan" element={<TripPlanPage />} />
+                  {/* 대시보드 페이지 라우트 */}
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                </Routes>
           </main>
 
           {/* 하단 푸터 */}

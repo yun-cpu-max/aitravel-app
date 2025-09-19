@@ -46,12 +46,13 @@ const HeroSection = () => {
             </p>
             {/* 버튼만 남김 */}
             <div className="mt-10">
-              <button
+            <button
                 onClick={handleStartPlan}
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
-              >
-                AI로 여행 시작하기
-              </button>
+                className="w-full sm:w-auto bg-black hover:bg-sky-400 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition-all"
+                  >
+                 AI로 여행 시작하기
+            </button>
+
             </div>
           </div>
 
