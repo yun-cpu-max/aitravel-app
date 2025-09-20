@@ -6,7 +6,7 @@
  */
 
 // React 기본 훅 import
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // React Router DOM import (라우팅 관련)
 import { Link } from 'react-router-dom';
@@ -36,25 +36,41 @@ const DashboardPage = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
 
   // 여행 상태별 필터 옵션
-  const filterOptions = [
+  const filterOptions = useMemo(() => [
     { value: 'all', label: '전체 여행', count: 0 },
     { value: 'planning', label: '계획 중', count: 0 },
     { value: 'confirmed', label: '확정됨', count: 0 },
     { value: 'ongoing', label: '진행 중', count: 0 },
     { value: 'completed', label: '완료됨', count: 0 }
-  ];
+  ], []);
 
-  // 컴포넌트 마운트 시 여행 데이터 로드
-  useEffect(() => {
-    loadTrips();
-  }, []);
+  /**
+   * 필터별 여행 수를 업데이트하는 함수
+   * - 각 상태별로 여행 수를 계산하여 필터 옵션에 반영
+   *
+   * @param {Array} tripList - 여행 목록
+   */
+  const updateFilterCounts = useCallback((tripList) => {
+    const counts = {
+      all: tripList.length,
+      planning: tripList.filter(trip => trip.status === 'planning').length,
+      confirmed: tripList.filter(trip => trip.status === 'confirmed').length,
+      ongoing: tripList.filter(trip => trip.status === 'ongoing').length,
+      completed: tripList.filter(trip => trip.status === 'completed').length
+    };
+    
+    // 필터 옵션의 카운트 업데이트
+    filterOptions.forEach(option => {
+      option.count = counts[option.value];
+    });
+  }, [filterOptions]);
 
   /**
    * 여행 데이터를 로드하는 함수
    * - 실제 서비스에서는 API 호출로 데이터를 가져옴
    * - 현재는 데모용 더미 데이터를 사용
    */
-  const loadTrips = async () => {
+  const loadTrips = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -147,28 +163,12 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [updateFilterCounts]);
 
-  /**
-   * 필터별 여행 수를 업데이트하는 함수
-   * - 각 상태별로 여행 수를 계산하여 필터 옵션에 반영
-   *
-   * @param {Array} tripList - 여행 목록
-   */
-  const updateFilterCounts = (tripList) => {
-    const counts = {
-      all: tripList.length,
-      planning: tripList.filter(trip => trip.status === 'planning').length,
-      confirmed: tripList.filter(trip => trip.status === 'confirmed').length,
-      ongoing: tripList.filter(trip => trip.status === 'ongoing').length,
-      completed: tripList.filter(trip => trip.status === 'completed').length
-    };
-    
-    // 필터 옵션의 카운트 업데이트
-    filterOptions.forEach(option => {
-      option.count = counts[option.value];
-    });
-  };
+  // 컴포넌트 마운트 시 여행 데이터 로드
+  useEffect(() => {
+    loadTrips();
+  }, [loadTrips]);
 
   /**
    * 선택된 필터에 따라 여행 목록을 필터링하는 함수
@@ -390,14 +390,23 @@ const DashboardPage = () => {
 
                   {/* 액션 버튼 */}
                   <div className="mt-6 flex space-x-3">
-                    <Link
-                      to={`/trip-detail/${trip.id}`}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
-                    >
-                      상세보기
-                    </Link>
+                    {trip.status === 'completed' ? (
+                      <Link
+                        to={`/archive/${trip.id}`}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white text-center py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                      >
+                        기록 보기
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/trip-detail/${trip.id}`}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                      >
+                        상세보기
+                      </Link>
+                    )}
                     <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
-                      수정하기
+                      {trip.status === 'completed' ? '공유' : '수정하기'}
                     </button>
                   </div>
                 </div>

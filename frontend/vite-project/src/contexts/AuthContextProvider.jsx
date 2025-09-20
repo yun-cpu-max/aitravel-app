@@ -29,24 +29,38 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * 컴포넌트 마운트 시 실행되는 useEffect
-   * - localStorage에서 저장된 사용자 정보를 로드
-   * - 앱 시작 시 이전 로그인 상태를 복원
+   * - 서버 재시작 시에만 로그인 상태를 초기화
+   * - 브라우저 새로고침/탭 닫기-열기는 로그인 상태 유지
    */
   useEffect(() => {
     /**
-     * localStorage에서 사용자 정보를 로드하는 함수
-     * - 저장된 사용자 정보가 있으면 state에 설정
-     * - 오류 발생 시 localStorage를 정리하고 로그 출력
+     * 서버 재시작을 감지하고 사용자 정보를 로드하는 함수
+     * - 서버 재시작 시에만 로그인 상태 초기화
+     * - 브라우저 새로고침 시에는 localStorage에서 복원
      */
     const loadUser = () => {
       try {
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-          setUser(JSON.parse(savedUser));
+        // 서버 재시작 감지를 위한 세션 스토리지 확인
+        const serverSession = sessionStorage.getItem('serverSession');
+        const currentServerTime = Date.now().toString();
+        
+        // 서버 재시작 감지 (세션 스토리지가 없거나 서버 시간이 다름)
+        if (!serverSession) {
+          // 서버 재시작으로 간주하고 로그인 상태 초기화
+          localStorage.removeItem('user');
+          sessionStorage.setItem('serverSession', currentServerTime);
+          setUser(null);
+        } else {
+          // 브라우저 새로고침으로 간주하고 localStorage에서 복원
+          const savedUser = localStorage.getItem('user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          }
         }
       } catch (error) {
         console.error('사용자 정보 로드 실패:', error);
         localStorage.removeItem('user');
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
