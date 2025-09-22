@@ -95,6 +95,12 @@ const Navbar = ({ onOpenModal }) => {
                         나의 여행 대시보드
                       </Link>
                       <Link
+                        to="/archive/demo-trip-1"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        여행 아카이브
+                      </Link>
+                      <Link
                         to="/profile"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
