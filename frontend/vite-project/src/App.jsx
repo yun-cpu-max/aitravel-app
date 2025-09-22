@@ -27,6 +27,7 @@ import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
 import TripArchivePage from './pages/TripArchivePage';
+import SignUpPage from './pages/sign-up';
 
 /**
  * App 컴포넌트
@@ -85,6 +86,8 @@ function App() {
                   />
                   {/* 로그인 페이지 라우트 */}
                   <Route path="/login" element={<LoginPage />} />
+                  {/* 회원가입 페이지 라우트 */}
+                  <Route path="/sign-up" element={<SignUpPage />} />
                   {/* 프로필 페이지 라우트 */}
                   <Route path="/profile" element={<ProfilePage />} />
                   {/* 여행 계획 페이지 라우트 */}

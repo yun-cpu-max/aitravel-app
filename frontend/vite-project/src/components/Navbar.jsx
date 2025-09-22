@@ -46,7 +46,7 @@ const Navbar = ({ onOpenModal }) => {
           {/* 로고 영역 */}
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center space-x-3 hover:opacity-80 transition-opacity">
-              <img src="/logo.png" alt="스마트 여행 플래너" className="h-10 sm:h-11 md:h-12 w-auto object-contain" />
+              <img src="/logo.png" alt="스마트 여행 플래너" className="w-10 h-10 rounded-md" />
               <h1 className="text-2xl font-bold text-blue-600">
                 스마트 여행 플래너
               </h1>
