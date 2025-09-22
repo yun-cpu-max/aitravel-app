@@ -26,7 +26,6 @@ import TripPlanPage from './pages/TripPlanPage';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
-import TripArchivePage from './pages/TripArchivePage';
 
 /**
  * App 컴포넌트
@@ -91,8 +90,6 @@ function App() {
                   <Route path="/trip-plan" element={<TripPlanPage />} />
                   {/* 대시보드 페이지 라우트 */}
                   <Route path="/dashboard" element={<DashboardPage />} />
-                  {/* 여행 기록 아카이브 페이지 라우트 */}
-                  <Route path="/archive/:tripId" element={<TripArchivePage />} />
                 </Routes>
           </main>
 

@@ -153,7 +153,7 @@ const TripPlanPage = () => {
 
   // 네비게이션 차단을 위한 커스텀 이벤트 리스너
   useEffect(() => {
-    const handleLinkInteraction = (e) => {
+    const handleLinkClick = (e) => {
       // 폼 내부 요소들은 차단하지 않음
       if (e.target.closest('form') || 
           e.target.closest('[role="button"]') ||
@@ -172,28 +172,16 @@ const TripPlanPage = () => {
       // 네비게이션 링크만 차단
       const link = e.target.closest('a');
       if (link && hasUnsavedChanges) {
-        // 이벤트 완전 차단
         e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        
         setShowExitConfirm(true);
         // 클릭된 링크의 href를 저장하여 나중에 이동할 수 있도록 함
         window.pendingNavigation = link.href;
-        
-        // false 반환으로 추가 차단
-        return false;
       }
     };
 
-    // mousedown과 click 이벤트 모두 차단 (capture: true로 설정하여 더 일찍 차단)
-    document.addEventListener('mousedown', handleLinkInteraction, true);
-    document.addEventListener('click', handleLinkInteraction, true);
-    
-    return () => {
-      document.removeEventListener('mousedown', handleLinkInteraction, true);
-      document.removeEventListener('click', handleLinkInteraction, true);
-    };
+    // 모든 클릭에 이벤트 리스너 추가
+    document.addEventListener('click', handleLinkClick);
+    return () => document.removeEventListener('click', handleLinkClick);
   }, [hasUnsavedChanges]);
 
   // 브라우저 뒤로가기/앞으로가기 차단
@@ -240,16 +228,14 @@ const TripPlanPage = () => {
     
     // 저장된 네비게이션 URL이 있으면 해당 페이지로 이동
     if (window.pendingNavigation) {
-      const targetUrl = window.pendingNavigation;
-      window.pendingNavigation = null; // 먼저 초기화
-      
-      if (targetUrl === 'back') {
+      if (window.pendingNavigation === 'back') {
         // 뒤로가기인 경우
         window.history.back();
-      } else if (targetUrl) {
+      } else {
         // 특정 URL로 이동하는 경우
-        window.location.href = targetUrl;
+        window.location.href = window.pendingNavigation;
       }
+      window.pendingNavigation = null;
     }
   };
 
