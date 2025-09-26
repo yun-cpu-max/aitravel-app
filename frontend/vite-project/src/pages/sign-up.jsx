@@ -32,12 +32,39 @@ const SignUpPage = () => {
     if (password.length < 8) return setError('비밀번호는 8자 이상이어야 합니다.');
     if (password !== confirm) return setError('비밀번호가 일치하지 않습니다.');
 
-    // TODO: 실제 API 요청 (POST /api/users or /api/auth/signup)
-    // 데모: 성공 가정 후 바로 로그인 처리
+    // 실제 백엔드 API 호출
     setIsLoading(true);
     try {
-      const result = await login({ name, email, provider: 'local' });
-      if (result.success) navigate('/profile');
+      const response = await fetch('http://localhost:8081/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 회원가입 성공
+        const result = await login({ 
+          name: data.user.name, 
+          email: data.user.email, 
+          provider: 'local',
+          token: data.token
+        });
+        if (result.success) navigate('/profile');
+      } else {
+        // 회원가입 실패
+        setError(data.message || '회원가입에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('회원가입 오류:', error);
+      setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsLoading(false);
     }

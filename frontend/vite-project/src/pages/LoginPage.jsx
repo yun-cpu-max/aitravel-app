@@ -30,6 +30,57 @@ const LoginPage = () => {
   
   // 로딩 상태를 관리하는 state
   const [isLoading, setIsLoading] = useState(false);
+  
+  // 이메일/비밀번호 로그인 상태
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  /**
+   * 이메일/비밀번호 로그인 처리 함수
+   */
+  const handleEmailLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email.trim()) return setError('이메일을 입력해주세요.');
+    if (!password.trim()) return setError('비밀번호를 입력해주세요.');
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('http://localhost:8081/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 로그인 성공
+        const result = await login({ 
+          name: data.user.name, 
+          email: data.user.email, 
+          provider: 'local',
+          token: data.token
+        });
+        if (result.success) navigate('/profile');
+      } else {
+        // 로그인 실패
+        setError(data.message || '로그인에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('로그인 오류:', error);
+      setError('서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   /**
    * Google 로그인 처리 함수
@@ -123,32 +174,38 @@ const LoginPage = () => {
           </div>
 
           {/* 이메일/비밀번호 입력 */}
-          <div className="space-y-5">
+          <form onSubmit={handleEmailLogin} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
-              <input type="email" placeholder="you@example.com" className="w-full h-12 px-4 rounded-lg border border-gray-300 focus:ring-cyan-500 focus:border-cyan-500" />
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com" 
+                className="w-full h-12 px-4 rounded-lg border border-gray-300 focus:ring-cyan-500 focus:border-cyan-500" 
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
-              <input type="password" placeholder="••••••••" className="w-full h-12 px-4 rounded-lg border border-gray-300 focus:ring-cyan-500 focus:border-cyan-500" />
-              
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••" 
+                className="w-full h-12 px-4 rounded-lg border border-gray-300 focus:ring-cyan-500 focus:border-cyan-500" 
+              />
             </div>
+            
+            {error && <div className="text-sm text-red-600">{error}</div>}
+            
             <button
-              onClick={async () => {
-                setIsLoading(true);
-                try {
-                  const result = await login({ name: '일반 사용자', email: 'user@example.com', provider: 'local' });
-                  if (result.success) navigate('/profile');
-                } finally {
-                  setIsLoading(false);
-                }
-              }}
+              type="submit"
               disabled={isLoading}
               className="w-full h-12 rounded-lg bg-cyan-400 hover:bg-cyan-500 text-white font-semibold transition-colors disabled:opacity-60"
             >
               {isLoading ? '로그인 중...' : '로그인'}
             </button>
-          </div>
+          </form>
 
           {/* 가입 유도 */}
           <div className="mt-6 text-center text-sm text-gray-600">

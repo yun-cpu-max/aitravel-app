@@ -47,6 +47,18 @@ public class User {
     @Column(nullable = false, length = 100)
     private String name;
 
+    /** 소셜 로그인 제공자 (예: "google", "kakao", "naver") */
+    @Column(length = 50)
+    private String provider;
+
+    /** 소셜 로그인 제공자에서의 사용자 ID */
+    @Column(name = "provider_id", length = 100)
+    private String providerId;
+
+    /** 프로필 이미지 URL */
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
+
     /**
      * @OneToMany: 1:N 관계 매핑 (한 사용자 : 여러 여행)
      * mappedBy = "user": Trip 엔티티의 user 필드가 연관관계의 주인
@@ -90,6 +102,12 @@ public class User {
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getProviderId() { return providerId; }
+    public void setProviderId(String providerId) { this.providerId = providerId; }
+    public String getProfileImageUrl() { return profileImageUrl; }
+    public void setProfileImageUrl(String profileImageUrl) { this.profileImageUrl = profileImageUrl; }
     public List<Trip> getTrips() { return trips; }
     public void setTrips(List<Trip> trips) { this.trips = trips; }
     public LocalDateTime getCreatedAt() { return createdAt; }
