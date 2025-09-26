@@ -30,14 +30,14 @@ public class UserPreferencesController {
     }
 
     @GetMapping("/users/{userId}/preferences")
-    public ResponseEntity<UserPreferencesDtos.Resp> get(@PathVariable Long userId) {
+    public ResponseEntity<UserPreferencesDtos.Resp> get(@PathVariable("userId") Long userId) {
         User user = userRepository.findById(userId).orElseThrow();
         Optional<UserPreferences> pref = preferencesRepository.findByUser(user);
         return pref.map(p -> ResponseEntity.ok(toResp(p))).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PutMapping("/users/{userId}/preferences")
-    public ResponseEntity<UserPreferencesDtos.Resp> upsert(@PathVariable Long userId, @Valid @RequestBody UserPreferencesDtos.UpsertReq req) {
+    public ResponseEntity<UserPreferencesDtos.Resp> upsert(@PathVariable("userId") Long userId, @Valid @RequestBody UserPreferencesDtos.UpsertReq req) {
         User user = userRepository.findById(userId).orElseThrow();
         Optional<UserPreferences> prefOpt = preferencesRepository.findByUser(user);
         UserPreferences pref = prefOpt.orElseGet(UserPreferences::new);

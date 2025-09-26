@@ -50,12 +50,17 @@ const SignUpPage = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // 회원가입 성공
+        // 회원가입 성공 - 백엔드에서 받은 모든 사용자 데이터 전달
         const result = await login({ 
+          id: data.user.id,
           name: data.user.name, 
           email: data.user.email, 
           provider: 'local',
-          token: data.token
+          providerId: data.user.providerId,
+          profileImageUrl: data.user.profileImageUrl,
+          token: data.token,
+          createdAt: data.user.createdAt,
+          updatedAt: data.user.updatedAt
         });
         if (result.success) navigate('/profile');
       } else {

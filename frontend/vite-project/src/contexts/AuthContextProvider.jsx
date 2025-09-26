@@ -73,14 +73,17 @@ export const AuthProvider = ({ children }) => {
    */
   const login = async (userData) => {
     try {
-      // TODO: 실제 OAuth 로그인 API 호출
-      // 임시로 사용자 데이터를 저장
+      // 실제 백엔드에서 받은 사용자 데이터 사용
       const userInfo = {
-        id: Date.now().toString(),
+        id: userData.id || Date.now().toString(), // 백엔드에서 받은 실제 ID 사용
         name: userData.name || '사용자',
         email: userData.email || 'user@example.com',
-        profileImage: userData.profileImage || null,
-        provider: userData.provider || 'google', // google, kakao, naver
+        profileImage: userData.profileImage || userData.profileImageUrl || null,
+        provider: userData.provider || 'local',
+        providerId: userData.providerId || null,
+        token: userData.token || null,
+        createdAt: userData.createdAt || new Date().toISOString(),
+        updatedAt: userData.updatedAt || new Date().toISOString(),
         loginTime: new Date().toISOString(),
         travelPreferences: {
           type: '',

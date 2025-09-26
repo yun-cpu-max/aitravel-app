@@ -27,7 +27,7 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   
   // 인증 관련 상태와 함수들을 가져옴
-  const { user, updateTravelPreferences, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   
   // 편집 모드 상태를 관리하는 state
   const [isEditing, setIsEditing] = useState(false);
@@ -52,7 +52,6 @@ const ProfilePage = () => {
   });
   
   // 프로필 사진 업로드 상태 관리
-  const [profileImage, setProfileImage] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState(null);
 
   // 백엔드 UserPreferences 엔티티 기반 여행 스타일 옵션
@@ -94,26 +93,56 @@ const ProfilePage = () => {
 
   // 사용자 정보 초기화
   useEffect(() => {
+    const loadUserPreferences = async () => {
+      if (!user?.id) return;
+      
+      try {
+        console.log('사용자 취향 로드 시작:', { userId: user.id });
+        
+        const response = await fetch(`http://localhost:8081/api/users/${user.id}/preferences`, {
+          headers: {
+            'Authorization': `Bearer ${user.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        console.log('취향 로드 응답:', response.status, response.statusText);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('로드된 취향 정보:', data);
+          setTravelPreferences({
+            travelStyle: data.travelStyle || '',
+            budgetRangeMin: data.budgetRangeMin || '',
+            budgetRangeMax: data.budgetRangeMax || '',
+            preferredAccommodationType: data.preferredAccommodationType || '',
+            preferredTransportation: data.preferredTransportation || ''
+          });
+        } else {
+          const errorText = await response.text();
+          console.error('취향 로드 실패:', errorText);
+        }
+      } catch (error) {
+        console.error('사용자 취향 로드 실패:', error);
+      }
+    };
+
     if (user) {
+      console.log('사용자 정보 설정:', user);
+      
       setUserInfo({
         name: user.name || '',
         email: user.email || '',
         profileImageUrl: user.profileImageUrl || ''
       });
       
-      // 여행 취향 정보 초기화 (백엔드 UserPreferences 엔티티 기반)
-      setTravelPreferences({
-        travelStyle: user.travelPreferences?.travelStyle || '',
-        budgetRangeMin: user.travelPreferences?.budgetRangeMin || '',
-        budgetRangeMax: user.travelPreferences?.budgetRangeMax || '',
-        preferredAccommodationType: user.travelPreferences?.preferredAccommodationType || '',
-        preferredTransportation: user.travelPreferences?.preferredTransportation || ''
-      });
-      
       // 프로필 사진 미리보기 설정
       if (user.profileImageUrl) {
         setProfileImagePreview(user.profileImageUrl);
       }
+      
+      // 백엔드에서 사용자 취향 정보 로드
+      loadUserPreferences();
     } else {
       // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
       navigate('/login');
@@ -171,8 +200,6 @@ const ProfilePage = () => {
   const handleProfileImageChange = (event) => {
     const file = event.target.files[0];
     if (file) {
-      setProfileImage(file);
-      
       // 미리보기 URL 생성
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -187,7 +214,6 @@ const ProfilePage = () => {
    * - 선택된 프로필 사진을 제거
    */
   const handleRemoveProfileImage = () => {
-    setProfileImage(null);
     setProfileImagePreview(null);
   };
 
@@ -199,50 +225,90 @@ const ProfilePage = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // 1. 프로필 사진 업로드 (있는 경우)
-      if (profileImage) {
-        // TODO: 실제 파일 업로드 API 호출
-        // const formData = new FormData();
-        // formData.append('profileImage', profileImage);
-        // const uploadResponse = await fetch('/api/upload/profile-image', {
-        //   method: 'POST',
-        //   body: formData
-        // });
-        // const uploadResult = await uploadResponse.json();
-        // const profileImageUrl = uploadResult.url;
-        
-        // 임시로 로컬 URL 사용 (실제로는 업로드된 URL을 사용)
-        console.log('프로필 사진 업로드됨:', profileImagePreview);
+      console.log('사용자 정보 저장 시작:', { userId: user.id, userInfo });
+      
+      // 1. 사용자 기본 정보 업데이트
+      const userResponse = await fetch(`http://localhost:8081/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: userInfo.name,
+          email: userInfo.email
+        })
+      });
+
+      console.log('사용자 정보 저장 응답:', userResponse.status, userResponse.statusText);
+
+      if (!userResponse.ok) {
+        const errorText = await userResponse.text();
+        console.error('사용자 정보 저장 실패:', errorText);
+        console.error('요청 데이터:', { name: userInfo.name, email: userInfo.email });
+        throw new Error(`사용자 정보 저장에 실패했습니다. (${userResponse.status}): ${errorText}`);
       }
 
-      // 2. 여행 취향 정보 업데이트
-      const updatedTravelPreferences = {
-        ...travelPreferences
-      };
-
-      // TODO: 실제 API 호출로 데이터 저장
-      // await fetch('/api/users/profile', {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     userInfo: updatedUserInfo,
-      //     travelPreferences: updatedTravelPreferences
-      //   })
-      // });
-
-      // 현재는 Context에서 자동으로 localStorage에 저장됨
-      updateTravelPreferences(updatedTravelPreferences);
+      const updatedUser = await userResponse.json();
+      console.log('업데이트된 사용자 정보:', updatedUser);
       
-      // 임시로 1초 후 저장 완료
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 2. 여행 취향 정보를 백엔드에 저장
+      console.log('취향 정보 저장 시작:', travelPreferences);
       
-      setIsSaving(false);
-      setIsEditing(false);
-      alert('프로필이 저장되었습니다!');
+      const preferencesResponse = await fetch(`http://localhost:8081/api/users/${user.id}/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${user.token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          travelStyle: travelPreferences.travelStyle,
+          budgetRangeMin: travelPreferences.budgetRangeMin ? parseInt(travelPreferences.budgetRangeMin) : null,
+          budgetRangeMax: travelPreferences.budgetRangeMax ? parseInt(travelPreferences.budgetRangeMax) : null,
+          preferredAccommodationType: travelPreferences.preferredAccommodationType,
+          preferredTransportation: travelPreferences.preferredTransportation
+        })
+      });
+
+      console.log('취향 정보 저장 응답:', preferencesResponse.status, preferencesResponse.statusText);
+
+      if (preferencesResponse.ok) {
+        const preferencesData = await preferencesResponse.json();
+        console.log('저장된 취향 정보:', preferencesData);
+        setTravelPreferences(preferencesData);
+        
+        // 3. 사용자 정보 업데이트 (생성일/수정일 포함)
+        setUserInfo({
+          name: updatedUser.name,
+          email: updatedUser.email,
+          profileImageUrl: updatedUser.profileImageUrl || ''
+        });
+        
+        // 4. 사용자 정보를 localStorage와 Context에도 업데이트
+        const updatedUserInfo = {
+          ...user,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          profileImageUrl: updatedUser.profileImageUrl || user.profileImageUrl,
+          updatedAt: updatedUser.updatedAt,
+          createdAt: updatedUser.createdAt
+        };
+        
+        // Context 업데이트
+        updateUser(updatedUserInfo);
+        
+        setIsSaving(false);
+        setIsEditing(false);
+        alert('프로필이 저장되었습니다!');
+      } else {
+        const errorText = await preferencesResponse.text();
+        console.error('취향 저장 실패:', errorText);
+        throw new Error(`취향 저장에 실패했습니다. (${preferencesResponse.status})`);
+      }
     } catch (error) {
       console.error('프로필 저장 실패:', error);
       setIsSaving(false);
-      alert('프로필 저장에 실패했습니다. 다시 시도해주세요.');
+      alert(`프로필 저장에 실패했습니다: ${error.message}`);
     }
   };
 
@@ -375,6 +441,7 @@ const ProfilePage = () => {
                 <div className="text-sm text-gray-500">
                   <p>계정 생성일: {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '정보 없음'}</p>
                   <p>마지막 수정일: {user?.updatedAt ? new Date(user.updatedAt).toLocaleDateString('ko-KR') : '정보 없음'}</p>
+                  <p>사용자 ID: {user?.id || '정보 없음'}</p>
                 </div>
               </div>
             </div>

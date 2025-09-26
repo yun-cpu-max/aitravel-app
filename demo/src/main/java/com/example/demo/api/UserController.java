@@ -74,6 +74,55 @@ public class UserController {
     }
 
     /**
+     * @GetMapping: HTTP GET 요청 매핑
+     * - URL: GET /api/users/{id}
+     * - 특정 사용자 정보를 조회
+     * 
+     * @param id 사용자 ID
+     * @return 사용자 정보 (UserDtos.Resp)
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<UserDtos.Resp> get(@PathVariable Long id) {
+        return userRepository.findById(id)
+                .map(user -> ResponseEntity.ok(toResp(user)))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * @PutMapping: HTTP PUT 요청 매핑
+     * - URL: PUT /api/users/{id}
+     * - 사용자 기본 정보 업데이트 (이름, 이메일)
+     * 
+     * @param id 사용자 ID
+     * @param req 사용자 정보 업데이트 요청 데이터
+     * @return 업데이트된 사용자 정보 (UserDtos.Resp)
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable("id") Long id, @Valid @RequestBody UserDtos.UpdateReq req) {
+        try {
+            System.out.println("사용자 업데이트 요청 - ID: " + id + ", 이름: " + req.name + ", 이메일: " + req.email);
+            
+            return userRepository.findById(id)
+                    .map(user -> {
+                        System.out.println("기존 사용자 정보 - ID: " + user.getId() + ", 이름: " + user.getName() + ", 이메일: " + user.getEmail());
+                        
+                        user.setName(req.name);
+                        user.setEmail(req.email);
+                        User saved = userRepository.save(user);
+                        
+                        System.out.println("업데이트된 사용자 정보 - ID: " + saved.getId() + ", 이름: " + saved.getName() + ", 이메일: " + saved.getEmail());
+                        
+                        return ResponseEntity.ok(toResp(saved));
+                    })
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            System.err.println("사용자 업데이트 에러: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("사용자 업데이트 실패: " + e.getMessage());
+        }
+    }
+
+    /**
      * User 엔티티를 UserDtos.Resp DTO로 변환하는 헬퍼 메소드
      * - 엔티티의 민감한 정보(비밀번호 등)를 제외하고 필요한 정보만 반환
      * 
@@ -85,7 +134,11 @@ public class UserController {
         r.id = u.getId();
         r.email = u.getEmail();
         r.name = u.getName();
+        r.provider = u.getProvider();
+        r.providerId = u.getProviderId();
+        r.profileImageUrl = u.getProfileImageUrl();
         r.createdAt = u.getCreatedAt();
+        r.updatedAt = u.getUpdatedAt();
         return r;
     }
 }

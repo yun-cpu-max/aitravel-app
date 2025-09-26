@@ -9,7 +9,7 @@
 import React, { useState, useEffect } from 'react';
 
 // React Router DOM import (라우팅 관련)
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 // 인증 관련 커스텀 훅 import
 import { useAuth } from '../hooks/useAuth';
@@ -23,6 +23,9 @@ import { useAuth } from '../hooks/useAuth';
  * @returns {JSX.Element} 렌더링된 DashboardPage 컴포넌트
  */
 const DashboardPage = () => {
+  // 페이지 네비게이션을 위한 훅
+  const navigate = useNavigate();
+  
   // 인증 관련 상태와 함수들을 가져옴
   const { user, isAuthenticated } = useAuth();
 
@@ -32,14 +35,13 @@ const DashboardPage = () => {
   // 로딩 상태 관리
   const [loading, setLoading] = useState(true);
   
-  // 선택된 필터 상태 관리 (전체, 계획중, 확정됨, 진행중, 완료됨)
+  // 선택된 필터 상태 관리 (전체, 계획중, 진행중, 완료됨)
   const [selectedFilter, setSelectedFilter] = useState('all');
 
   // 여행 상태별 필터 옵션
   const filterOptions = [
     { value: 'all', label: '전체 여행', count: 0 },
     { value: 'planning', label: '계획 중', count: 0 },
-    { value: 'confirmed', label: '확정됨', count: 0 },
     { value: 'ongoing', label: '진행 중', count: 0 },
     { value: 'completed', label: '완료됨', count: 0 }
   ];
@@ -116,7 +118,7 @@ const DashboardPage = () => {
           numAdults: 2,
           numChildren: 1,
           totalBudget: 1500000,
-          status: "confirmed",
+          status: "ongoing",
           createdAt: "2025-01-10T14:30:00",
           updatedAt: "2025-01-12T09:15:00",
           days: []
@@ -130,7 +132,7 @@ const DashboardPage = () => {
           numAdults: 1,
           numChildren: 0,
           totalBudget: 2000000,
-          status: "ongoing",
+          status: "completed",
           createdAt: "2025-01-05T16:20:00",
           updatedAt: "2025-01-20T11:45:00",
           days: []
@@ -158,8 +160,7 @@ const DashboardPage = () => {
   const updateFilterCounts = (tripList) => {
     const counts = {
       all: tripList.length,
-      planning: tripList.filter(trip => trip.status === 'planning').length,
-      confirmed: tripList.filter(trip => trip.status === 'confirmed').length,
+      planning: tripList.filter(trip => trip.status === 'planning' || trip.status === 'confirmed').length,
       ongoing: tripList.filter(trip => trip.status === 'ongoing').length,
       completed: tripList.filter(trip => trip.status === 'completed').length
     };
@@ -180,6 +181,9 @@ const DashboardPage = () => {
   const getFilteredTrips = () => {
     if (selectedFilter === 'all') {
       return trips;
+    }
+    if (selectedFilter === 'planning') {
+      return trips.filter(trip => trip.status === 'planning' || trip.status === 'confirmed');
     }
     return trips.filter(trip => trip.status === selectedFilter);
   };
@@ -211,7 +215,7 @@ const DashboardPage = () => {
   const getStatusText = (status) => {
     const statusMap = {
       planning: '계획 중',
-      confirmed: '확정됨',
+      confirmed: '계획 중', // 확정됨도 계획 중으로 표시
       ongoing: '진행 중',
       completed: '완료됨'
     };
@@ -396,9 +400,18 @@ const DashboardPage = () => {
                     >
                       상세보기
                     </Link>
-                    <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
-                      수정하기
-                    </button>
+                    {trip.status === 'completed' ? (
+                      <button 
+                        onClick={() => navigate(`/trip-archive/${trip.id}`)}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                      >
+                        여행 아카이브
+                      </button>
+                    ) : (
+                      <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
+                        수정하기
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

@@ -7,8 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 public class UserPreferencesDtos {
 
     public static class UpsertReq {
-        @NotBlank(message = "여행 스타일(travelStyle)은 필수입니다.")
-        public String travelStyle; // 휴양/액티비티/문화/미식 등
+        public String travelStyle; // 휴양/액티비티/문화/미식 등 (선택사항)
         @Min(value = 0, message = "예산 최소값은 0 이상이어야 합니다.")
         public Integer budgetRangeMin;
         @Min(value = 0, message = "예산 최대값은 0 이상이어야 합니다.")
