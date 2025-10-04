@@ -23,6 +23,7 @@ import Footer from './components/Footer';
 
 // 페이지 컴포넌트들 import
 import TripPlanPage from './pages/TripPlanPage';
+import TripPlanPageEx1 from './pages/TripPlanPageEx1';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
@@ -92,6 +93,8 @@ function App() {
                   <Route path="/profile" element={<ProfilePage />} />
                   {/* 여행 계획 페이지 라우트 */}
                   <Route path="/trip-plan" element={<TripPlanPage />} />
+                  {/* 비교용 새로운 여행 계획 마법사 라우트 */}
+                  <Route path="/trip-plan-ex1" element={<TripPlanPageEx1 />} />
                   {/* 대시보드 페이지 라우트 */}
                   <Route path="/dashboard" element={<DashboardPage />} />
                   {/* 여행 기록 아카이브 페이지 라우트 */}
