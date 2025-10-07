@@ -37,6 +37,8 @@ const TODAY = new Date();
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 
+// (정적지도 사용으로 JS 로더는 미사용)
+
 const TripPlanPageEx1 = () => {
   // 0: 공통 입력, 1: 모드 선택, 2: 분기 본문(직접/AI), 3: 편집/확인
   const [step, setStep] = useState(0);
@@ -116,18 +118,18 @@ const TripPlanPageEx1 = () => {
   // }, [googleReady]);
 
   // 목업 도시 데이터
-  const mockCities = [
-    { name: '도쿄, 일본', lat: 35.6762, lng: 139.6503 },
-    { name: '파리, 프랑스', lat: 48.8566, lng: 2.3522 },
-    { name: '제주도, 한국', lat: 33.4996, lng: 126.5312 },
-    { name: '서울, 한국', lat: 37.5665, lng: 126.9780 },
-    { name: '부산, 한국', lat: 35.1796, lng: 129.0756 },
-    { name: '뉴욕, 미국', lat: 40.7128, lng: -74.0060 },
-    { name: '런던, 영국', lat: 51.5074, lng: -0.1278 },
-    { name: '시드니, 호주', lat: -33.8688, lng: 151.2093 },
-    { name: '방콕, 태국', lat: 13.7563, lng: 100.5018 },
-    { name: '싱가포르', lat: 1.3521, lng: 103.8198 },
-  ];
+  // const mockCities = [
+  //   { name: '도쿄, 일본', lat: 35.6762, lng: 139.6503 },
+  //   { name: '파리, 프랑스', lat: 48.8566, lng: 2.3522 },
+  //   { name: '제주도, 한국', lat: 33.4996, lng: 126.5312 },
+  //   { name: '서울, 한국', lat: 37.5665, lng: 126.9780 },
+  //   { name: '부산, 한국', lat: 35.1796, lng: 129.0756 },
+  //   { name: '뉴욕, 미국', lat: 40.7128, lng: -74.0060 },
+  //   { name: '런던, 영국', lat: 51.5074, lng: -0.1278 },
+  //   { name: '시드니, 호주', lat: -33.8688, lng: 151.2093 },
+  //   { name: '방콕, 태국', lat: 13.7563, lng: 100.5018 },
+  //   { name: '싱가포르', lat: 1.3521, lng: 103.8198 },
+  // ];
 
   // 수동 검색 핸들러 (버튼 클릭) - 백엔드 프록시 호출
   const handleSearchCity = async () => {
@@ -153,10 +155,11 @@ const TripPlanPageEx1 = () => {
         throw new Error(`HTTP ${res.status} ${res.statusText}: ${text}`);
       }
       const data = await res.json();
-      const list = (data.suggestions || []).map((s) => ({
-        place_id: s?.placePrediction?.placeId,
-        description: s?.placePrediction?.text?.text || ''
-      })).filter((x) => x.place_id && x.description);
+      // 백엔드 정규화 결과만 사용하여 표시 텍스트 일관화
+      const normalized = Array.isArray(data.normalizedSuggestions) ? data.normalizedSuggestions : [];
+      const list = normalized
+        .map((n) => ({ place_id: n.placeId, description: n.display }))
+        .filter((x) => x.place_id && typeof x.description === 'string' && x.description.trim().length > 0);
       setSuggestions(list);
     } catch (err) {
       if (import.meta.env.DEV) console.warn('autocomplete 호출 실패', err);
@@ -572,11 +575,18 @@ const TripPlanPageEx1 = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-12">
+      <div className="px-4 py-12 max-w-none">
         <HeaderView step={step} />
 
         {step === 0 && (
-          <CommonFormView state={state} handlers={handlers} />
+          <div className="flex flex-col min-[500px]:flex-row gap-6 w-full">
+            <div className="min-[500px]:w-[600px] w-full">
+              <CommonFormView state={state} handlers={handlers} />
+            </div>
+            <div className="flex-1">
+              <MapPreview selectedDestination={selectedDestination} />
+            </div>
+          </div>
         )}
         {step === 1 && (
           <ModeSelect />
@@ -647,11 +657,12 @@ function CommonFormView({ state, handlers }) {
   } = handlers;
 
   return (
-    <div className="bg-white p-6 md:p-8 rounded-lg shadow-md w-full max-w-3xl mx-auto text-left">
+    <div className="bg-white p-6 md:p-8 rounded-lg shadow-md w-full text-left">
       <h2 className="text-xl font-semibold text-gray-800 mb-4">기본 정보</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="md:col-span-2 relative">
-          <label className="block text-sm text-gray-600 mb-1">도시/나라</label>
+          <label className="block text-sm text-gray-600 mb-1">여행을 떠나고 싶은 도시를
+          선택해 주세요.</label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -684,8 +695,7 @@ function CommonFormView({ state, handlers }) {
                     onMouseDown={() => handleSelectPrediction(s.place_id, s.description)}
                     className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0"
                   >
-                    <div className="font-semibold text-gray-800">{s.structured_formatting?.main_text || s.description}</div>
-                    <div className="text-xs text-gray-500">{s.structured_formatting?.secondary_text}</div>
+                    <div className="font-semibold text-gray-800">{s.description}</div>
                   </li>
                 ))
               )}
@@ -720,7 +730,7 @@ function CommonFormView({ state, handlers }) {
             type="text"
             value={departurePoint}
             onChange={(e) => setDeparturePoint(e.target.value)}
-            placeholder="예: 인천공항 / 서울역 / 숙소 주소"
+            placeholder="예: 인천공항 / 서울역 "
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
             autoComplete="off"
             onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
@@ -848,6 +858,76 @@ function CommonFormView({ state, handlers }) {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function MapPreview({ selectedDestination }) {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const mapRef = React.useRef(null);
+  const mapInstanceRef = React.useRef(null);
+  const markerRef = React.useRef(null);
+  const hasPoint = selectedDestination && typeof selectedDestination.lat === 'number' && typeof selectedDestination.lng === 'number';
+
+  React.useEffect(() => {
+    let mounted = true;
+    // 동적 로드
+    const ensure = () => new Promise((resolve, reject) => {
+      if (window.google && window.google.maps) return resolve(window.google.maps);
+      if (!apiKey) return reject(new Error('no-key'));
+      const id = 'gmaps-js-sdk';
+      const exist = document.getElementById(id);
+      if (!exist) {
+        const s = document.createElement('script');
+        s.id = id;
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&language=ko&loading=async`;
+        s.async = true;
+        s.defer = true;
+        s.onload = () => resolve(window.google.maps);
+        s.onerror = () => reject(new Error('load-fail'));
+        document.head.appendChild(s);
+      } else {
+        const check = () => (window.google && window.google.maps) ? resolve(window.google.maps) : setTimeout(check, 50);
+        check();
+      }
+    });
+
+    ensure().then((maps) => {
+      if (!mounted) return;
+      if (!mapInstanceRef.current && mapRef.current) {
+        mapInstanceRef.current = new maps.Map(mapRef.current, {
+          center: { lat: 37.5665, lng: 126.9780 },
+          zoom: 11,
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
+        });
+      }
+      if (!mapInstanceRef.current) return;
+      if (hasPoint) {
+        const pos = { lat: selectedDestination.lat, lng: selectedDestination.lng };
+        mapInstanceRef.current.setCenter(pos);
+        mapInstanceRef.current.setZoom(12);
+        if (!markerRef.current) {
+          markerRef.current = new maps.Marker({ position: pos, map: mapInstanceRef.current, title: selectedDestination.name });
+        } else {
+          markerRef.current.setPosition(pos);
+          markerRef.current.setTitle(selectedDestination.name || '선택 위치');
+        }
+      }
+    }).catch(() => {/* 키 미설정 등 */});
+
+    return () => { mounted = false; };
+  }, [apiKey, hasPoint, selectedDestination?.lat, selectedDestination?.lng, selectedDestination?.name]);
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md h-[420px]">
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">지도 미리보기</h3>
+      {apiKey ? (
+        <div ref={mapRef} className="w-full h-[340px] border rounded" />
+      ) : (
+        <div className="w-full h-[340px] border rounded flex items-center justify-center text-gray-400">브라우저 키(.env VITE_GOOGLE_MAPS_API_KEY)가 필요합니다</div>
       )}
     </div>
   );
