@@ -34,6 +34,8 @@ const defaultDirectPlan = () => ({
 
 // 달력 유틸과 오늘 날짜는 최상위에 고정해 두어 재정의로 인한 리렌더/포커스 손실을 방지
 const TODAY = new Date();
+const TODAY_START = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
 const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 
@@ -74,14 +76,30 @@ const TripPlanPageEx1 = () => {
 
   const handleDateClick = (day) => {
     const selected = new Date(viewYear, viewMonth, day);
-    if (!startDate || (startDate && endDate)) {
+    if (selected < TODAY_START) return; // 과거 금지
+
+    // 시작 없음 또는 범위 완료 상태면: 새 시작
+    if (!startDate || endDate) {
       setStartDate(selected);
       setEndDate(null);
-    } else if (selected > startDate) {
+      return;
+    }
+
+    // 시작만 선택된 상태
+    if (selected < startDate) {
+      // 더 이른 날짜를 클릭하면 그 날짜가 새로운 시작
+      setStartDate(selected);
+      setEndDate(null);
+      return;
+    }
+
+    // 시작 이후 클릭: 10일 윈도 안이면 종료로 확정, 밖이면 시작을 재설정
+    const diffDays = Math.floor((selected - startDate) / MS_PER_DAY) + 1; // 포함일수
+    if (diffDays <= 10) {
       setEndDate(selected);
     } else {
-      setEndDate(startDate);
       setStartDate(selected);
+      setEndDate(null);
     }
   };
 
@@ -196,18 +214,20 @@ const TripPlanPageEx1 = () => {
 
   // ... (직접 선택 및 AI 모드 로직은 그대로 유지)
   // 직접 선택: 일정 조작 상태
-  const [selectedCategories, setSelectedCategories] = useState(['관광지', '음식']);
-  const [placeSearch, setPlaceSearch] = useState('');
+  // 기존 목업 상태는 제거(미사용 경고 방지)
+  // 제거된 목업 상태: 사용 안 함
+  // const [selectedCategories] = useState(['관광지', '음식']);
+  // const [placeSearch] = useState('');
   const [directPlan, setDirectPlan] = useState(defaultDirectPlan());
 
+  // 직접 선택: Google Places 기반 검색 상태 (명소/카페/음식점)
+  const [directQuery, setDirectQuery] = useState('');
+  const [directTypes, setDirectTypes] = useState(['tourist_attraction', 'restaurant', 'cafe']);
+  const [directResults, setDirectResults] = useState([]); // [{id,name,address,lat,lng,type}]
+  const [searchTick, setSearchTick] = useState(0); // 검색 트리거
+
   // 직접 선택: 후보 목록 필터 (상태 선언 이후로 이동)
-  const filteredPlaces = useMemo(() => {
-    const q = placeSearch.trim().toLowerCase();
-    return MOCK_PLACES.filter((p) =>
-      (selectedCategories.includes(p.category)) &&
-      (!q || p.name.toLowerCase().includes(q))
-    );
-  }, [placeSearch, selectedCategories]);
+  // const filteredPlaces = useMemo(() => [], []);
 
   // AI 모드 상태(목업)
   const [aiLoading, setAiLoading] = useState(false);
@@ -363,22 +383,29 @@ const TripPlanPageEx1 = () => {
     </div>
   );
 
-  // 직접 선택 본문
+  // 직접 선택 본문 (좌: 검색/리스트, 우: 지도)
   const DirectMode = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
-      <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md text-left">
+    <div className="flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto">
+      {/* Left Pane */}
+      <div className="w-full lg:w-[520px] bg-white p-6 rounded-lg shadow-md text-left">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">A. 직접 필수 장소 선택</h3>
+
+        {/* 카테고리(명소/음식점/카페) */}
         <div className="mb-4">
           <div className="text-sm text-gray-600 mb-2">카테고리</div>
           <div className="flex flex-wrap gap-2">
-            {CATEGORY_OPTIONS.map((c) => (
-              <label key={c.key} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm cursor-pointer">
+            {[
+              { k: 'tourist_attraction', label: '명소' },
+              { k: 'restaurant', label: '음식점' },
+              { k: 'cafe', label: '카페' },
+            ].map((c) => (
+              <label key={c.k} className="inline-flex items-center gap-2 px-3 py-2 border rounded-lg text-sm cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={selectedCategories.includes(c.label)}
+                  checked={directTypes.includes(c.k)}
                   onChange={(e) => {
                     const on = e.target.checked;
-                    setSelectedCategories((prev) => on ? [...prev, c.label] : prev.filter((x) => x !== c.label));
+                    setDirectTypes((prev) => on ? [...prev, c.k] : prev.filter((x) => x !== c.k));
                   }}
                 />
                 <span>{c.label}</span>
@@ -387,29 +414,43 @@ const TripPlanPageEx1 = () => {
           </div>
         </div>
 
+        {/* 키워드 검색 */}
         <div className="mb-4">
           <div className="text-sm text-gray-600 mb-2">장소 검색</div>
-          <input
-            type="text"
-            value={placeSearch}
-            onChange={(e) => setPlaceSearch(e.target.value)}
-            placeholder="장소 이름으로 검색"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-          />
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {filteredPlaces.map((p) => (
-              <div key={p.id} className="p-3 border rounded-lg flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-gray-800">{p.name}</div>
-                  <div className="text-xs text-gray-500">{p.category} · 기본 {p.stayMinutes}분</div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={directQuery}
+              onChange={(e) => setDirectQuery(e.target.value)}
+              placeholder="예: 성산 일출봉, 맛집, 카페"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            />
+            <button
+              type="button"
+              onClick={() => setSearchTick((t) => t + 1)}
+              className="px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+            >
+              검색
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3">
+            {directResults.length === 0 ? (
+              <div className="text-sm text-gray-500">검색 결과가 없습니다.</div>
+            ) : (
+              directResults.map((p) => (
+                <div key={p.id} className="p-3 border rounded-lg flex items-center justify-between">
+                  <div>
+                    <div className="font-medium text-gray-800">{p.name}</div>
+                    <div className="text-xs text-gray-500">{p.address || p.type}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    {[0,1,2].map((di) => (
+                      <button key={di} onClick={() => addPlaceToDay(di, { id: p.id, name: p.name, category: p.type, stayMinutes: 60 })} className="text-xs px-2 py-1 border rounded hover:bg-gray-50">Day {di+1} 추가</button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {[0,1,2].map((di) => (
-                    <button key={di} onClick={() => addPlaceToDay(di, p)} className="text-xs px-2 py-1 border rounded hover:bg-gray-50">Day {di+1} 추가</button>
-                  ))}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -467,16 +508,16 @@ const TripPlanPageEx1 = () => {
         </div>
       </div>
 
-      {/* 우측 요약/지도 자리(지도는 목업) */}
-      <div className="bg-white p-6 rounded-lg shadow-md text-left">
-        <h3 className="text-lg font-semibold text-gray-800 mb-3">요약</h3>
-        <ul className="text-sm text-gray-700 space-y-1">
-          <li>여행지: <span className="font-medium">{selectedDestination.name || '-'}</span></li>
-          <li>기간: <span className="font-medium">{dateRange || '-'}</span></li>
-          <li>인원: <span className="font-medium">{people}</span></li>
-          <li>예산: <span className="font-medium">{budget.toLocaleString()}원</span></li>
-        </ul>
-        <div className="mt-4 h-40 bg-gray-100 border rounded flex items-center justify-center text-gray-400 text-sm">지도(목업)</div>
+      {/* Right Pane: 지도 */}
+      <div className="flex-1">
+        <DirectSearchMap
+          centerLat={selectedDestination.lat}
+          centerLng={selectedDestination.lng}
+          query={directQuery}
+          types={directTypes}
+          tick={searchTick}
+          onResults={setDirectResults}
+        />
       </div>
     </div>
   );
@@ -710,7 +751,7 @@ function CommonFormView({ state, handlers }) {
         </div>
 
         <div className="md:col-span-2 relative">
-          <label className="block text-sm text-gray-600 mb-1">날짜(기간)</label>
+          <label className="block text-sm text-gray-600 mb-1">날짜(기간)최대 10일</label>
           <input
             type="text"
             value={dateRange}
@@ -836,17 +877,27 @@ function CommonFormView({ state, handlers }) {
                 const d = new Date(viewYear, viewMonth, day);
                 const isStart = state.startDate && d.toDateString() === state.startDate.toDateString();
                 const isEnd = state.endDate && d.toDateString() === state.endDate.toDateString();
-                const isSelected = state.startDate && d >= state.startDate && (!state.endDate || d <= state.endDate);
+                // 선택 표시 규칙:
+                // - 종료가 있으면 [start..end] 범위를 표시
+                // - 종료가 없으면 [start..start+9] 윈도우를 표시(최대 10일)
+                const windowMax = state.startDate && !state.endDate
+                  ? new Date(state.startDate.getTime() + (10 - 1) * MS_PER_DAY)
+                  : null;
+                const inWindow = state.startDate && !state.endDate && d >= state.startDate && d <= windowMax;
+                const inFinalRange = state.startDate && state.endDate && d >= state.startDate && d <= state.endDate;
+                const isSelected = inFinalRange || inWindow;
                 const isToday = d.toDateString() === TODAY.toDateString();
+                const isPast = d < TODAY_START;
                 return (
                   <button
                     key={day}
                     onClick={() => handleDateClick(day)}
+                    disabled={isPast}
                     className={`py-2 rounded-full font-medium transition-colors ${
                       isStart || isEnd ? 'bg-blue-600 text-white' : ''
                     } ${
                       isSelected && !isStart && !isEnd ? 'bg-blue-200 text-blue-800' : 'text-gray-700 hover:bg-gray-200'
-                    } ${isToday ? 'border-2 border-blue-500' : ''}`}
+                    } ${isToday ? 'border-2 border-blue-500' : ''} ${isPast ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''}`}
                   >
                     {day}
                   </button>
@@ -881,7 +932,7 @@ function MapPreview({ selectedDestination }) {
       if (!exist) {
         const s = document.createElement('script');
         s.id = id;
-        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&language=ko&loading=async`;
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&language=ko&libraries=places,marker&loading=async`;
         s.async = true;
         s.defer = true;
         s.onload = () => resolve(window.google.maps);
@@ -909,11 +960,14 @@ function MapPreview({ selectedDestination }) {
         const pos = { lat: selectedDestination.lat, lng: selectedDestination.lng };
         mapInstanceRef.current.setCenter(pos);
         mapInstanceRef.current.setZoom(12);
+        const Adv = maps.marker && maps.marker.AdvancedMarkerElement;
         if (!markerRef.current) {
-          markerRef.current = new maps.Marker({ position: pos, map: mapInstanceRef.current, title: selectedDestination.name });
+          markerRef.current = Adv
+            ? new Adv({ map: mapInstanceRef.current, position: pos, title: selectedDestination.name })
+            : new maps.Marker({ position: pos, map: mapInstanceRef.current, title: selectedDestination.name });
         } else {
-          markerRef.current.setPosition(pos);
-          markerRef.current.setTitle(selectedDestination.name || '선택 위치');
+          if (markerRef.current.setPosition) markerRef.current.setPosition(pos);
+          if (markerRef.current.setTitle) markerRef.current.setTitle(selectedDestination.name || '선택 위치');
         }
       }
     }).catch(() => {/* 키 미설정 등 */});
@@ -929,6 +983,111 @@ function MapPreview({ selectedDestination }) {
       ) : (
         <div className="w-full h-[340px] border rounded flex items-center justify-center text-gray-400">브라우저 키(.env VITE_GOOGLE_MAPS_API_KEY)가 필요합니다</div>
       )}
+    </div>
+  );
+}
+
+// Google Places Nearby/Text 검색과 마커 클러스터링(간단)
+function DirectSearchMap({ centerLat, centerLng, query, types, tick, onResults }) {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const mapRef = React.useRef(null);
+  const mapRefInstance = React.useRef(null);
+  const markersRef = React.useRef([]);
+
+  React.useEffect(() => {
+    if (!apiKey) return;
+    const ensure = () => new Promise((resolve, reject) => {
+      if (window.google && window.google.maps && window.google.maps.places) return resolve(window.google.maps);
+      const id = 'gmaps-js-sdk';
+      let s = document.getElementById(id);
+      if (!s) {
+        s = document.createElement('script');
+        s.id = id;
+        s.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&language=ko&libraries=places,marker&loading=async`;
+        s.async = true;
+        s.defer = true;
+        s.onload = () => resolve(window.google.maps);
+        s.onerror = () => reject(new Error('load-fail'));
+        document.head.appendChild(s);
+      } else {
+        const check = () => (window.google && window.google.maps && window.google.maps.places) ? resolve(window.google.maps) : setTimeout(check, 50);
+        check();
+      }
+    });
+
+    let cancelled = false;
+    ensure().then((maps) => {
+      if (cancelled) return;
+      if (!mapRefInstance.current && mapRef.current) {
+        const center = (typeof centerLat === 'number' && typeof centerLng === 'number') ? { lat: centerLat, lng: centerLng } : { lat: 37.5665, lng: 126.9780 };
+        mapRefInstance.current = new maps.Map(mapRef.current, {
+          center,
+          zoom: 12,
+          streetViewControl: false,
+          mapTypeControl: false,
+        });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [apiKey, centerLat, centerLng]);
+
+  // 검색 트리거
+  React.useEffect(() => {
+    if (!window.google || !window.google.maps || !window.google.maps.places) return;
+    if (!mapRefInstance.current) return;
+
+    // 기존 마커 제거
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current = [];
+
+    const maps = window.google.maps;
+    const service = new maps.places.PlacesService(mapRefInstance.current);
+
+    const request = {
+      location: (typeof centerLat === 'number' && typeof centerLng === 'number') ? new maps.LatLng(centerLat, centerLng) : mapRefInstance.current.getCenter(),
+      radius: 5000,
+      keyword: query || undefined,
+      type: undefined,
+    };
+
+    // types 배열을 순회하며 NearbySearch 여러 번 병렬 수행(간단 구현)
+    const typeList = Array.isArray(types) && types.length > 0 ? types : ['tourist_attraction'];
+    const all = [];
+    let done = 0;
+    typeList.forEach((t) => {
+      service.nearbySearch({ ...request, type: t }, (results, status) => {
+        done += 1;
+        if (status === maps.places.PlacesServiceStatus.OK && Array.isArray(results)) {
+          results.forEach((r) => {
+            const pos = r.geometry && r.geometry.location ? { lat: r.geometry.location.lat(), lng: r.geometry.location.lng() } : null;
+            if (!pos) return;
+            const Adv = maps.marker && maps.marker.AdvancedMarkerElement;
+            const marker = Adv
+              ? new Adv({ map: mapRefInstance.current, position: pos, title: r.name })
+              : new maps.Marker({ position: pos, map: mapRefInstance.current, title: r.name });
+            markersRef.current.push(marker);
+            all.push({ id: r.place_id, name: r.name, address: r.vicinity || r.formatted_address, lat: pos.lat, lng: pos.lng, type: t });
+          });
+        }
+        if (done === typeList.length) {
+          if (typeof onResults === 'function') onResults(all);
+        }
+      });
+    });
+  }, [tick, centerLat, centerLng, query, types, onResults]);
+
+  // 중심 이동
+  React.useEffect(() => {
+    if (!mapRefInstance.current) return;
+    if (typeof centerLat === 'number' && typeof centerLng === 'number') {
+      mapRefInstance.current.setCenter({ lat: centerLat, lng: centerLng });
+    }
+  }, [centerLat, centerLng]);
+
+  return (
+    <div className="bg-white p-6 rounded-lg shadow-md h-[780px]">
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">검색 지도</h3>
+      <div ref={mapRef} className="w-full h-[700px] border rounded" />
     </div>
   );
 }
