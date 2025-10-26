@@ -112,7 +112,7 @@ public class PlacesProxyController {
      * @param sessionToken 선택: 클라이언트 측 세션 토큰(요금 최적화용). 현재 미사용
      * @return Google 응답의 일부 필드(PlaceId, 텍스트)만 포함한 JSON Map
      */
-    @org.springframework.web.bind.annotation.PostMapping("/autocomplete")
+    @org.springframework.web.bind.annotation.RequestMapping(value = "/autocomplete", method = {org.springframework.web.bind.annotation.RequestMethod.GET, org.springframework.web.bind.annotation.RequestMethod.POST})
     public ResponseEntity<?> autocomplete(@RequestParam("q") String query,
                                           @RequestParam(value = "session", required = false) String sessionToken) {
         if (query == null || query.trim().isEmpty()) {
@@ -312,6 +312,78 @@ public class PlacesProxyController {
     }
 
     // Static Maps 프록시는 더 이상 사용하지 않습니다 (JS 지도 사용).
+
+    /**
+     * Place Details 프록시
+     * - placeId로 장소의 상세 정보(사진, 설명, 이름 등)를 조회합니다.
+     * - Google Places API (New) - Place Details 사용
+     *
+     * @param placeId Google Place ID
+     * @return Place Details 정보 (photos, editorialSummary, displayName, formattedAddress 등)
+     */
+    @GetMapping("/details")
+    public ResponseEntity<?> placeDetails(@RequestParam("placeId") String placeId) {
+        if (placeId == null || placeId.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "placeId를 입력하세요."));
+        }
+
+        // Places API (New) - Place Details
+        String url = "https://places.googleapis.com/v1/places/" + placeId;
+
+        try {
+            ResponseEntity<Map> response = restClient.get()
+                    .uri(URI.create(url))
+                    .header("X-Goog-Api-Key", apiKey)
+                    .header("X-Goog-FieldMask", "id,displayName,formattedAddress,editorialSummary,photos,location")
+                    .retrieve()
+                    .toEntity(Map.class);
+
+            return ResponseEntity.status(response.getStatusCode()).body(response.getBody());
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            org.springframework.http.HttpStatusCode statusCode = e.getStatusCode();
+            String responseBody = e.getResponseBodyAsString(java.nio.charset.StandardCharsets.UTF_8);
+            return ResponseEntity.status(statusCode != null ? statusCode : org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of(
+                            "message", "Google API 오류",
+                            "status", statusCode != null ? statusCode.value() : 500,
+                            "response", responseBody
+                    ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Map.of(
+                    "message", "Place Details 조회에 실패했습니다.",
+                    "detail", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Place Photo 프록시
+     * - photo name으로 실제 이미지를 반환합니다.
+     * - Google Places API (New) - Place Photos 사용
+     *
+     * @param photoName 사진 리소스 이름 (예: places/ChIJ.../photos/...)
+     * @param maxWidth 최대 너비 (픽셀, 기본값 400)
+     * @return 이미지 바이트 배열
+     */
+    @GetMapping("/photo")
+    public ResponseEntity<?> placePhoto(
+            @RequestParam("name") String photoName,
+            @RequestParam(value = "maxWidth", defaultValue = "400") int maxWidth) {
+        if (photoName == null || photoName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        // Places API (New) - Place Photos
+        // 브라우저가 구글 CDN으로 직접 내려받도록 302 리다이렉트로 처리
+        String url = "https://places.googleapis.com/v1/" + photoName + 
+                "/media?maxWidthPx=" + Math.max(100, Math.min(maxWidth, 1600)) +
+                "&key=" + apiKey;
+
+        return ResponseEntity.status(302)
+                .location(URI.create(url))
+                .header("Cache-Control", "public, max-age=86400")
+                .build();
+    }
 }
 
 

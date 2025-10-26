@@ -18,6 +18,7 @@ import { AuthProvider } from './contexts/AuthContextProvider';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import FeatureSection from './components/FeatureSection';
+import PopularDestinations from './components/PopularDestinations';
 import HowItWorksModal from './components/HowItWorksModal';
 import Footer from './components/Footer';
 
@@ -82,6 +83,7 @@ function App() {
                       <>
                         <HeroSection />
                         <FeatureSection />
+                        <PopularDestinations />
                       </>
                     }
                   />

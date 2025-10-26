@@ -25,12 +25,13 @@ const HowItWorksModal = ({ isOpen, onClose }) => {
   /**
    * 이용 방법의 4단계 데이터
    * - 각 단계는 번호, 제목, 설명을 포함
+   * - 실제 구현된 플로우를 반영
    */
   const steps = [
-    { step: '1', title: '여행 정보 입력', description: '가고 싶은 도시, 날짜, 취향 등을 알려주세요.' },
-    { step: '2', title: 'AI가 일정 생성', description: 'AI가 실시간으로 최적의 여행 계획을 만들어줍니다.' },
-    { step: '3', title: '일정 확인 및 수정', description: '생성된 일정을 확인하고, 원하는 대로 수정할 수 있습니다.' },
-    { step: '4', title: '여행 시작', description: '이제 AI와 함께 즐거운 여행을 떠나세요.' },
+    { step: '1', title: '여행지 & 날짜 선택', description: '도시를 검색하고 지도로 확인하세요. 최대 10일까지 여행 기간을 설정할 수 있습니다.' },
+    { step: '2', title: '모드 선택', description: '장소를 직접 고르는 "직접 선택 모드" 또는 "AI 자동 생성 모드" 중 선택하세요.' },
+    { step: '3', title: '장소 검색 & 일정 구성', description: '명소, 음식점, 카페를 검색하고 Day별로 추가하세요. 지도에서 위치를 확인할 수 있습니다.' },
+    { step: '4', title: '일정 완성 & 저장', description: '체류 시간을 조정하고 순서를 변경해 나만의 여행 계획을 완성하세요.' },
   ];
 
   return (
