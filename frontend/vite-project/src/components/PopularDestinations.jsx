@@ -109,6 +109,9 @@ const POPULAR_DESTINATIONS = [
 //   { id: 30, name: '제주', country: '대한민국', searchQuery: 'Jeju' },
 ];
 
+const CACHE_KEY = 'popularDestinations_cache';
+const CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24시간
+
 const PopularDestinations = () => {
   const [destinations, setDestinations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,17 +153,67 @@ const PopularDestinations = () => {
     imgRetryRef.current.delete(dest.id);
   };
 
-  // 초기 로드: 30개 도시의 Place ID를 autocomplete로 가져온 후 상세 정보 조회 (점진적 로딩)
+  // 초기 로드: localStorage 캐시 확인 후 없으면 API로 가져오기
   useEffect(() => {
     let cancelled = false;
     let firstLoaded = false;
     const perItemDelayMs = 260; // 각 도시 호출 사이 간격(레이트리밋 완화)
     
+    // localStorage에서 캐시 확인
+    const loadFromCache = () => {
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (!cached) return null;
+        
+        const { data, timestamp } = JSON.parse(cached);
+        const now = Date.now();
+        
+        // 캐시가 만료되지 않았고, 데이터가 있으면 사용
+        if (now - timestamp < CACHE_EXPIRY_MS && data && data.length > 0) {
+          console.log(`✅ Loading ${data.length} destinations from cache`);
+          return data;
+        }
+        
+        // 만료된 캐시 삭제
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      } catch (error) {
+        console.warn('Failed to load cache:', error);
+        return null;
+      }
+    };
+    
+    // localStorage에 캐시 저장
+    const saveToCache = (data) => {
+      try {
+        const cacheData = {
+          data: data,
+          timestamp: Date.now()
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        console.log(`💾 Cached ${data.length} destinations`);
+      } catch (error) {
+        console.warn('Failed to save cache:', error);
+      }
+    };
+    
     const fetchAllDestinations = async () => {
       setLoading(true);
+      
+      // 먼저 캐시 확인
+      const cachedData = loadFromCache();
+      if (cachedData) {
+        setDestinations(cachedData);
+        setLoading(false);
+        firstLoaded = true;
+        console.log('🚀 Loaded from cache, skipping API calls');
+        return;
+      }
+      
       setDestinations([]); // 초기화
       
       const testDestinations = POPULAR_DESTINATIONS; // 전체 30개 처리
+      const fetchedDestinations = []; // API로 가져온 데이터를 모으기 위한 배열
       
       // 🚀 점진적 로딩: 각 도시를 가져오는 즉시 화면에 표시
       for (const dest of testDestinations) {
@@ -208,6 +261,9 @@ const PopularDestinations = () => {
             summary: dest.description || '',
           };
           
+          // fetchedDestinations 배열에 추가
+          fetchedDestinations.push(newDest);
+          
           // ✨ 즉시 화면에 추가!
           if (!cancelled) {
             setDestinations(prev => [...prev, newDest]);
@@ -234,8 +290,10 @@ const PopularDestinations = () => {
             displayName: dest.name,
             photoUrl: null,
             location: null,
-            summary: '',
+            summary: dest.description || '',
           };
+          
+          fetchedDestinations.push(fallback);
           
           if (!cancelled) {
             setDestinations(prev => [...prev, fallback]);
@@ -250,6 +308,10 @@ const PopularDestinations = () => {
       
       if (!cancelled) {
         console.log('🎉 All destinations loaded!');
+        // 모든 데이터를 가져온 후 localStorage에 캐시 저장
+        if (fetchedDestinations.length > 0) {
+          saveToCache(fetchedDestinations);
+        }
       }
     };
 
@@ -311,7 +373,7 @@ const PopularDestinations = () => {
       <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-800 mb-3"> 인기 여행지</h2>
+            <h2 className="text-4xl font-bold text-gray-800 mb-3"> 여행지</h2>
             <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
           </div>
           <div className="flex justify-center items-center py-20">
@@ -326,7 +388,7 @@ const PopularDestinations = () => {
     <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>
+          <h2 className="text-4xl font-bold text-gray-800 mb-3"> 여행지</h2>
           <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
         </div>
 
