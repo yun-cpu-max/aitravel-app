@@ -48,7 +48,7 @@ const Navbar = ({ onOpenModal }) => {
             <Link to="/" className="flex-shrink-0 flex items-center space-x-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="스마트 여행 플래너" className="w-10 h-10 rounded-md" />
               <h1 className="text-2xl font-bold text-blue-600">
-                스마트 여행 플래너
+                AI 여행 플래너
               </h1>
             </Link>
           </div>
@@ -66,7 +66,7 @@ const Navbar = ({ onOpenModal }) => {
               
               {/* 여행 계획하기 버튼 */}
               <Link
-                to="/trip-plan"
+                to="/trip-plan-ex1"
                 className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
               >
                 여행 계획하기
@@ -94,12 +94,12 @@ const Navbar = ({ onOpenModal }) => {
                       >
                         나의 여행 대시보드
                       </Link>
-                      <Link
+                      {/* <Link
                         to="/archive/demo-trip-1"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       >
                         여행 아카이브
-                      </Link>
+                      </Link> */}
                       <Link
                         to="/profile"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

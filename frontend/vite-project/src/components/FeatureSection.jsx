@@ -33,9 +33,13 @@ const FeatureSection = () => {
       description: '교통 상황 및 혼잡도를 고려한 최적 경로를 제시합니다.',
     },
     {
-      title: '예산 맞춤 계획',
-      description: '설정한 예산에 맞춰 최고의 가성비 여행을 계획합니다.',
+      title: '여행 대시보드',
+      description: '이전 여행,  계획중인 여행, 최근 활동을 한 화면에서 확인하세요.',
     },
+    // {
+    //   title: '예산 맞춤 계획',
+    //   description: '설정한 예산에 맞춰 최고의 가성비 여행을 계획합니다.',
+    // },
     {
       title: '개인 취향 분석',
       description: '과거 여행 기록을 분석해 다음 여행에 반영합니다.',
@@ -44,10 +48,10 @@ const FeatureSection = () => {
       title: '통합 예약 지원',
       description: '항공권, 숙소, 교통 수단을 한 번에 예약하고 관리하세요.',
     },
-    {
-      title: '실시간 경비 추적기',
-      description: '여행 중 지출을 실시간으로 기록하고 예산을 관리할 수 있습니다.',
-    },
+    // {
+    //   title: '실시간 경비 추적기',
+    //   description: '여행 중 지출을 실시간으로 기록하고 예산을 관리할 수 있습니다.',
+    // },
   ];
 
   /**
@@ -95,11 +99,11 @@ const FeatureSection = () => {
           </button>
 
           {/* 현재 기능 표시 */}
-          <div className="bg-gray-50 p-6 rounded-xl shadow-lg w-full max-w-md transition-transform duration-500 ease-in-out transform scale-100 min-h-60 flex flex-col justify-center items-center">
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">
+          <div className="bg-gray-50 p-8 rounded-xl shadow-lg w-full max-w-4xl transition-transform duration-500 ease-in-out transform scale-100 min-h-60 flex flex-col justify-center items-center">
+            <h3 className="text-2xl font-semibold text-gray-700 mb-4">
               {features[currentIndex].title}
             </h3>
-            <p className="text-gray-500 text-sm">
+            <p className="text-gray-500 text-base">
               {features[currentIndex].description}
             </p>
           </div>

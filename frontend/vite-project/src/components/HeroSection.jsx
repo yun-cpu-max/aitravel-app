@@ -27,7 +27,7 @@ const HeroSection = () => {
    * - 여행 계획 페이지로 이동
    */
   const handleStartPlan = () => {
-    navigate('/trip-plan');
+    navigate('/trip-plan-ex1');
   };
 
   return (
@@ -40,7 +40,7 @@ const HeroSection = () => {
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-gray-900 leading-tight">
               당신의 완벽한 여행,
               <br />
-              AI가 계획합니다.
+              AI가 도와줍니다.
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed">
               개인 맞춤형 여행 일정을 AI가 자동으로 생성해드립니다. 더 이상 복잡한 계획에 시간을 낭비하지 마세요.

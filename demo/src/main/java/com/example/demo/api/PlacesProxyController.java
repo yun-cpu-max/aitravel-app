@@ -334,7 +334,8 @@ public class PlacesProxyController {
             ResponseEntity<Map> response = restClient.get()
                     .uri(URI.create(url))
                     .header("X-Goog-Api-Key", apiKey)
-                    .header("X-Goog-FieldMask", "id,displayName,formattedAddress,editorialSummary,photos,location")
+                    .header("X-Goog-FieldMask", "id,displayName,formattedAddress,photos,location")
+                    .header("X-Goog-Language-Code", lang)
                     .retrieve()
                     .toEntity(Map.class);
 

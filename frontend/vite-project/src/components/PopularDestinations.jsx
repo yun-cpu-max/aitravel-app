@@ -7,50 +7,106 @@
 
 import React, { useState, useEffect } from 'react';
 
+// ---- rate limit helpers -------------------------------------------------
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableStatus = (status) => {
+  // 구글 프록시 403(일시적 차단/제한), 429(쿼터), 500/502/503/504 등은 재시도
+  return status === 403 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+};
+
+async function fetchJsonWithRetry(url, options = {}, {
+  retries = 2,
+  backoffMs = 700,
+  maxBackoffMs = 2500,
+  label = 'request',
+} = {}) {
+  let attempt = 0;
+  let lastError;
+  while (attempt <= retries) {
+    try {
+      console.debug(`[retry] ${label} try #${attempt + 1} →`, url);
+      const res = await fetch(url, options);
+      if (!res.ok) {
+        if (isRetryableStatus(res.status) && attempt < retries) {
+          // 지수 백오프 + 지터
+          const jitter = Math.random() * 0.25 * backoffMs;
+          const delay = Math.min(backoffMs * Math.pow(2, attempt) + jitter, maxBackoffMs);
+          console.warn(`[retry] ${label} HTTP ${res.status}. retry in ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})`);
+          await sleep(delay);
+          attempt += 1;
+          continue;
+        }
+        const text = await res.text().catch(() => '');
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        err.body = text;
+        throw err;
+      }
+      const data = await res.json();
+      if (attempt > 0) console.info(`[retry] ${label} succeeded on attempt #${attempt + 1}`);
+      return data;
+    } catch (e) {
+      lastError = e;
+      if (attempt < retries) {
+        const jitter = Math.random() * 0.25 * backoffMs;
+        const delay = Math.min(backoffMs * Math.pow(2, attempt) + jitter, maxBackoffMs);
+        console.warn(`[retry] ${label} error: ${e?.message || e}. retry in ${Math.round(delay)}ms (attempt ${attempt + 1}/${retries})`);
+        await sleep(delay);
+        attempt += 1;
+        continue;
+      }
+      console.error(`[retry] ${label} failed after ${attempt + 1} attempts`, e);
+      throw lastError;
+    }
+  }
+  throw lastError || new Error('Unknown fetch error');
+}
+
 /**
  * 30개 인기 여행지 목록
  * - autocomplete API로 실제 Place ID를 가져옴
  */
 const POPULAR_DESTINATIONS = [
   // 아시아
-  { id: 1, name: '도쿄', country: '일본', searchQuery: 'Tokyo' },
-  { id: 2, name: '교토', country: '일본', searchQuery: 'Kyoto' },
-  { id: 3, name: '방콕', country: '태국', searchQuery: 'Bangkok' },
-  { id: 4, name: '치앙마이', country: '태국', searchQuery: 'Chiang Mai' },
-  { id: 5, name: '발리', country: '인도네시아', searchQuery: 'Bali' },
-  { id: 6, name: '싱가포르', country: '싱가포르', searchQuery: 'Singapore' },
-  { id: 7, name: '타이베이', country: '대만', searchQuery: 'Taipei' },
-  { id: 8, name: '하노이', country: '베트남', searchQuery: 'Hanoi' },
-  { id: 9, name: '다낭', country: '베트남', searchQuery: 'Da Nang' },
+  { id: 1, name: '도쿄', country: '일본', searchQuery: 'Tokyo', description: '일본의 수도로 현대적인 문화와 전통이 공존하는 도시\n에펠탑과 세계적인 미식의 천국' },
+  { id: 2, name: '교토', country: '일본', searchQuery: 'Kyoto', description: '고요함과 아름다운 전통 건축물이 있는 고대 일본의 수도\n불교 사원과 봄벚꽃의 낭만' },
+  { id: 3, name: '방콕', country: '태국', searchQuery: 'Bangkok', description: '태국의 왕궁과 화려한 불교 사원으로 유명한 대도시\n태국 요리와 시장의 활기' },
+  { id: 4, name: '치앙마이', country: '태국', searchQuery: 'Chiang Mai', description: '북부 산악 지대의 미식과 전통 마사지로 유명\n원숭이와 에코 투어의 중심' },
+  { id: 5, name: '발리', country: '인도네시아', searchQuery: 'Bali', description: '열대 해변과 평화로운 사원이 있는 낙원 같은 휴양지\n서핑과 요가로 힐링하는 곳' },
+  { id: 6, name: '싱가포르', country: '싱가포르', searchQuery: 'Singapore', description: '현대적 식문화와 다양한 쇼핑을 즐길 수 있는 깨끗한 도시\n마리나 베이와 가든스 바이 더 베이' },
+  { id: 7, name: '타이베이', country: '대만', searchQuery: 'Taipei', description: '재래시장과 현대 건축이 어우러진 미식의 도시\n타이베이 101과 야시장의 매력' },
+  { id: 8, name: '하노이', country: '베트남', searchQuery: 'Hanoi', description: '오래된 거리와 프랑스 식민지 건물로 가득한 역사적 도시\n보님이와 베트남 커피의 고향' },
+  { id: 9, name: '다낭', country: '베트남', searchQuery: 'Da Nang', description: '아름다운 해변과 맛있는 베트남 요리가 있는 휴양도시\n골든 브릿지와 바나힐에서 즐기는 액티비티' },
   
   // 유럽
-  { id: 10, name: '파리', country: '프랑스', searchQuery: 'Paris' },
-  { id: 11, name: '런던', country: '영국', searchQuery: 'London' },
-  { id: 12, name: '로마', country: '이탈리아', searchQuery: 'Rome' },
-  { id: 13, name: '피렌체', country: '이탈리아', searchQuery: 'Florence' },
-  { id: 14, name: '바르셀로나', country: '스페인', searchQuery: 'Barcelona' },
-  { id: 15, name: '리스본', country: '포르투갈', searchQuery: 'Lisbon' },
-  { id: 16, name: '프라하', country: '체코', searchQuery: 'Prague' },
-  { id: 17, name: '인터라켄', country: '스위스', searchQuery: 'Interlaken' },
-  { id: 18, name: '베를린', country: '독일', searchQuery: 'Berlin' },
-  { id: 19, name: '이스탄불', country: '튀르키예', searchQuery: 'Istanbul' },
+  { id: 10, name: '파리', country: '프랑스', searchQuery: 'Paris', description: '예술과 낭만의 도시 에펠탑과 루브르 박물관\n파리지앵의 일상과 화려한 건축물' },
+  { id: 11, name: '런던', country: '영국', searchQuery: 'London', description: '빅벤과 타임즈 강에서 영국 문화의 매력을 경험\n아침 식사와 티타임의 고전적인 도시' },
+  { id: 12, name: '로마', country: '이탈리아', searchQuery: 'Rome', description: '콜로세움과 고대 유적이 여전히 살아있는 역사의 중심지\n이탈리안 파스타와 갤래토의 본고장' },
+  { id: 13, name: '피렌체', country: '이탈리아', searchQuery: 'Florence', description: '르네상스 미술과 건축이 가득한 작은 유럽의 보석\n두오모와 우피치 미술관' },
+  { id: 14, name: '바르셀로나', country: '스페인', searchQuery: 'Barcelona', description: '가우디의 건축물과 활기찬 야외 분위기가 돋보이\n라 부푸티바와 타파스의 천국' },
+  { id: 15, name: '리스본', country: '포르투갈', searchQuery: 'Lisbon', description: '노란 트램과 포르투 와인으로 유명한 서유럽의 보석\n파스텔 드 나타와 전통 포르투갈 요리' },
+  { id: 16, name: '프라하', country: '체코', searchQuery: 'Prague', description: '중세 시대 분위기의 아름다운 성과 다리가 있는 낭만\n체코 맥주와 프라하 성' },
+  { id: 17, name: '인터라켄', country: '스위스', searchQuery: 'Interlaken', description: '알프스 산맥과 호수로 둘러싸인 최고의 자연 휴양지\n하이킹과 스키로 즐기는 액티비티' },
+  { id: 18, name: '베를린', country: '독일', searchQuery: 'Berlin', description: '변화하는 역사와 현대적인 예술이 만나는 독일의 수도\n베를린 장벽과 클럽 문화' },
+  
   
   // 아메리카
-  { id: 20, name: '뉴욕', country: '미국', searchQuery: 'New York' },
-  { id: 21, name: '로스앤젤레스', country: '미국', searchQuery: 'Los Angeles' },
-  { id: 22, name: '밴쿠버', country: '캐나다', searchQuery: 'Vancouver' },
-  { id: 23, name: '칸쿤', country: '멕시코', searchQuery: 'Cancun' },
-  { id: 24, name: '부에노스아이레스', country: '아르헨티나', searchQuery: 'Buenos Aires' },
+  { id: 20, name: '뉴욕', country: '미국', searchQuery: 'New York', description: '타임스퀘어와 자유의 여신상이 있는 세계적인 대도시\n브로드웨이 쇼와 뉴욕 스타일 피자' },
+  { id: 21, name: '로스앤젤레스', country: '미국', searchQuery: 'Los Angeles', description: '할리우드와 비치의 도시 셀러브리티와 서핑의 낙원\n산타 모니카 해변과 유니버설 스튜디오' },
+  { id: 22, name: '밴쿠버', country: '캐나다', searchQuery: 'Vancouver', description: '산과 바다가 만나 자연을 느낄 수 있는 서캐나다의 거울도시\n스탠리 파크와 서부 캐나다의 자연 미식' },
+  { id: 23, name: '칸쿤', country: '멕시코', searchQuery: 'Cancun', description: '푸르른 카리브해와 휴양 리조트의 대표 여행지\n올인클루시브와 마야 문명 유적지' },
+  { id: 24, name: '부에노스아이레스', country: '아르헨티나', searchQuery: 'Buenos Aires', description: '탱고와 아르헨티나 스테이크로 유명한 남미의 파리\n라 보카와 아르헨티나 와인' },
   
   // 오세아니아
-  { id: 25, name: '시드니', country: '호주', searchQuery: 'Sydney' },
-  { id: 26, name: '멜버른', country: '호주', searchQuery: 'Melbourne' },
-  { id: 27, name: '퀸스타운', country: '뉴질랜드', searchQuery: 'Queenstown' },
+  { id: 25, name: '시드니', country: '호주', searchQuery: 'Sydney', description: '오페라 하우스와 해안 절경으로 유명한 호주의 대표 도시\n하버 브릿지와 본디 해변' },
+  { id: 26, name: '멜버른', country: '호주', searchQuery: 'Melbourne', description: '카페 문화와 예술로 가득한 호주에서 가장 살기 좋은 도시\n그레이 스트리트와 멜버른 컵 레이스' },
+  { id: 27, name: '퀸스타운', country: '뉴질랜드', searchQuery: 'Queenstown', description: '번지 점프와 스키로 유명한 모험과 아름다운 자연이 있는 곳\n밀포드 사운드와 뉴질랜드 와인' },
   
   // 국내
-  { id: 28, name: '서울', country: '대한민국', searchQuery: 'Seoul' },
-  { id: 29, name: '부산', country: '대한민국', searchQuery: 'Busan' },
-  { id: 30, name: '제주', country: '대한민국', searchQuery: 'Jeju' },
+//   { id: 28, name: '서울', country: '대한민국', searchQuery: 'Seoul' },
+//   { id: 29, name: '부산', country: '대한민국', searchQuery: 'Busan' },
+//   { id: 30, name: '제주', country: '대한민국', searchQuery: 'Jeju' },
 ];
 
 const PopularDestinations = () => {
@@ -59,11 +115,46 @@ const PopularDestinations = () => {
   const [selectedDestination, setSelectedDestination] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [destinationDetails, setDestinationDetails] = useState(null);
+  const imgRetryRef = React.useRef(new Map());
+
+  const handleImageError = (dest, ev) => {
+    const key = dest.id;
+    const attempts = imgRetryRef.current.get(key) || 0;
+    if (attempts < 2) {
+      imgRetryRef.current.set(key, attempts + 1);
+      const delay = 600 * (attempts + 1) + Math.random() * 200;
+      console.warn(`[img] ${dest.name} image error → retry #${attempts + 1} in ${Math.round(delay)}ms`);
+      setTimeout(() => {
+        try {
+          const currentSrc = ev?.target?.src || dest.photoUrl || '';
+          const url = new URL(currentSrc, window.location.origin);
+          url.searchParams.set('cb', Date.now().toString()); // 캐시 우회
+          ev.target.src = url.toString();
+        } catch {
+          const sep = (dest.photoUrl && dest.photoUrl.includes('?')) ? '&' : '?';
+          ev.target.src = `${dest.photoUrl}${sep}cb=${Date.now()}`;
+        }
+      }, delay);
+      return;
+    }
+    console.error(`[img] ${dest.name} image failed after ${attempts + 1} attempts. Fallback to initial.`);
+    imgRetryRef.current.delete(key);
+    // 최종 실패 시 카드만 이니셜 폴백으로 변경
+    setDestinations(prev => prev.map(d => d.id === dest.id ? { ...d, photoUrl: null } : d));
+  };
+
+  const handleImageLoad = (dest) => {
+    if (imgRetryRef.current.has(dest.id)) {
+      console.info(`[img] ${dest.name} image loaded after retry.`);
+    }
+    imgRetryRef.current.delete(dest.id);
+  };
 
   // 초기 로드: 30개 도시의 Place ID를 autocomplete로 가져온 후 상세 정보 조회 (점진적 로딩)
   useEffect(() => {
     let cancelled = false;
     let firstLoaded = false;
+    const perItemDelayMs = 260; // 각 도시 호출 사이 간격(레이트리밋 완화)
     
     const fetchAllDestinations = async () => {
       setLoading(true);
@@ -76,25 +167,29 @@ const PopularDestinations = () => {
         if (cancelled) return;
         
         try {
-          const autocompleteRes = await fetch('/api/places/autocomplete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ q: dest.searchQuery })
-          });
+          // 호출 간 간격 주기
+          await sleep(perItemDelayMs);
 
-          if (!autocompleteRes.ok) throw new Error('Autocomplete failed');
-          
-          const autocompleteData = await autocompleteRes.json();
+          const autocompleteData = await fetchJsonWithRetry(
+            '/api/places/autocomplete',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ q: dest.searchQuery })
+            },
+            { retries: 3, backoffMs: 800, maxBackoffMs: 3000, label: `AC ${dest.name}` }
+          );
           const normalized = autocompleteData.normalizedSuggestions || [];
           
           if (normalized.length === 0) throw new Error('No results');
           
           const placeId = normalized[0].placeId;
           
-          const detailsRes = await fetch(`/api/places/details?placeId=${encodeURIComponent(placeId)}`);
-          if (!detailsRes.ok) throw new Error('Details fetch failed');
-          
-          const detailsData = await detailsRes.json();
+          const detailsData = await fetchJsonWithRetry(
+            `/api/places/details?placeId=${encodeURIComponent(placeId)}`,
+            {},
+            { retries: 3, backoffMs: 900, maxBackoffMs: 3500, label: `DETAILS ${dest.name}` }
+          );
           
           let photoUrl = null;
           if (detailsData.photos && detailsData.photos.length > 0) {
@@ -110,6 +205,7 @@ const PopularDestinations = () => {
             displayName: detailsData.displayName?.text || dest.name,
             photoUrl: photoUrl,
             location: detailsData.location,
+            summary: dest.description || '',
           };
           
           // ✨ 즉시 화면에 추가!
@@ -138,6 +234,7 @@ const PopularDestinations = () => {
             displayName: dest.name,
             photoUrl: null,
             location: null,
+            summary: '',
           };
           
           if (!cancelled) {
@@ -170,23 +267,33 @@ const PopularDestinations = () => {
     setDestinationDetails(null);
 
     try {
-      const response = await fetch(`/api/places/details?placeId=${encodeURIComponent(destination.placeId)}`);
-      if (!response.ok) throw new Error('Failed to fetch details');
-
-      const data = await response.json();
+      const data = await fetchJsonWithRetry(
+        `/api/places/details?placeId=${encodeURIComponent(destination.placeId)}`,
+        {},
+        { retries: 3, backoffMs: 900, maxBackoffMs: 3500, label: `DETAILS(modal) ${destination.name}` }
+      );
+      
+      // 원본 도시 정보에서 description 가져오기
+      const originalDest = POPULAR_DESTINATIONS.find(d => d.id === destination.id);
+      const description = originalDest?.description || '';
       
       setDestinationDetails({
         displayName: data.displayName?.text || destination.name,
         formattedAddress: data.formattedAddress || '',
-        editorialSummary: data.editorialSummary?.text || '이 도시에 대한 설명이 제공되지 않습니다.',
+        editorialSummary: description,
         photos: data.photos || [],
       });
     } catch (error) {
       console.error('Failed to fetch destination details:', error);
+      
+      // 에러 발생 시에도 description 가져오기
+      const originalDest = POPULAR_DESTINATIONS.find(d => d.id === destination.id);
+      const description = originalDest?.description || '상세 정보를 불러올 수 없습니다.';
+      
       setDestinationDetails({
         displayName: destination.name,
         formattedAddress: '',
-        editorialSummary: '상세 정보를 불러올 수 없습니다.',
+        editorialSummary: description,
         photos: [],
       });
     } finally {
@@ -204,7 +311,7 @@ const PopularDestinations = () => {
       <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-800 mb-3"> 여행지</h2>
+            <h2 className="text-4xl font-bold text-gray-800 mb-3"> 인기 여행지</h2>
             <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
           </div>
           <div className="flex justify-center items-center py-20">
@@ -219,7 +326,7 @@ const PopularDestinations = () => {
     <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 mb-3"> 여행지</h2>
+          <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>
           <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
         </div>
 
@@ -239,6 +346,8 @@ const PopularDestinations = () => {
                     alt={dest.displayName}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     loading="lazy"
+                    onError={(e) => handleImageError(dest, e)}
+                    onLoad={() => handleImageLoad(dest)}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold">
@@ -312,7 +421,7 @@ const PopularDestinations = () => {
                   )}
 
                   <div className="prose prose-lg max-w-none">
-                    <p className="text-gray-700 leading-relaxed">
+                    <p className="text-gray-700 leading-relaxed whitespace-pre-line">
                       {destinationDetails.editorialSummary}
                     </p>
                   </div>
