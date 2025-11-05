@@ -441,7 +441,7 @@ const ProfilePage = () => {
                 <div className="text-sm text-gray-500">
                   <p>계정 생성일: {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '정보 없음'}</p>
                   <p>마지막 수정일: {user?.updatedAt ? new Date(user.updatedAt).toLocaleDateString('ko-KR') : '정보 없음'}</p>
-                  <p>사용자 ID: {user?.id || '정보 없음'}</p>
+                  
                 </div>
               </div>
             </div>
