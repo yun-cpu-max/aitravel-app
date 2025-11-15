@@ -373,7 +373,7 @@ const PopularDestinations = () => {
       <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-800 mb-3"> 여행지</h2>
+            <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>
             <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
           </div>
           <div className="flex justify-center items-center py-20">
@@ -388,7 +388,7 @@ const PopularDestinations = () => {
     <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-gray-800 mb-3"> 여행지</h2>
+          <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>
           <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
         </div>
 

@@ -303,36 +303,127 @@ const TripPlanPageEx1 = () => {
   // 직접 선택: Google Places 기반 검색 상태 (명소/카페/음식점)
   const [directQuery, setDirectQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all'); // 'all', '명소', '식당', '카페'
+  const [allPlaces, setAllPlaces] = useState([]); // API에서 가져온 전체 장소 목록
+  const [placesLoading, setPlacesLoading] = useState(false);
   
   // 선택된 장소 목록
   const [selectedPlaces, setSelectedPlaces] = useState([]); // [{id, name, category, address, image, likes, rating, lat, lng, stayHours, stayMinutes}]
   
-  // 하드코딩된 임시 장소 데이터
-  const mockPlaces = useMemo(() => [
-    { id: 'p1', name: '신세카이 혼도리 상점가', category: '명소', address: '오사카부 오사카시 나니와구', image: 'https://via.placeholder.com/60', likes: 74, rating: 4.0 },
-    { id: 'p2', name: '난바', category: '명소', address: '오사카부 오사카시 주오구', image: 'https://via.placeholder.com/60', likes: 69, rating: 4.3 },
-    { id: 'p3', name: '헵파이브 대관람차', category: '명소', address: '오사카부 오사카시 텐노지구', image: 'https://via.placeholder.com/60', likes: 59, rating: 4.2 },
-    { id: 'p4', name: '이치란라멘 도톤보리점 본관', category: '식당', address: '오사카부 오사카시 주오구 도톤보리', image: 'https://via.placeholder.com/60', likes: 57, rating: 4.5 },
-    { id: 'p5', name: '우메다 스카이빌딩', category: '명소', address: '오사카부 오사카시 기타구', image: 'https://via.placeholder.com/60', likes: 82, rating: 4.4 },
-    { id: 'p6', name: '도톤보리', category: '명소', address: '오사카부 오사카시 주오구', image: 'https://via.placeholder.com/60', likes: 91, rating: 4.6 },
-    { id: 'p7', name: '유니버설 스튜디오 재팬', category: '명소', address: '오사카부 오사카시 코노하나구', image: 'https://via.placeholder.com/60', likes: 156, rating: 4.8 },
-    { id: 'p8', name: '오사카 성', category: '명소', address: '오사카부 오사카시 주오구', image: 'https://via.placeholder.com/60', likes: 67, rating: 4.1 },
-    { id: 'p9', name: '신사이바시스지 상점가', category: '명소', address: '오사카부 오사카시 주오구', image: 'https://via.placeholder.com/60', likes: 73, rating: 4.3 },
-    { id: 'p10', name: '우메다 공중정원', category: '명소', address: '오사카부 오사카시 기타구', image: 'https://via.placeholder.com/60', likes: 65, rating: 4.2 },
-    { id: 'p11', name: '타코야키 무코무코', category: '식당', address: '오사카부 오사카시 주오구', image: 'https://via.placeholder.com/60', likes: 48, rating: 4.0 },
-    { id: 'p12', name: '스타벅스 도톤보리점', category: '카페', address: '오사카부 오사카시 주오구', image: 'https://via.placeholder.com/60', likes: 52, rating: 4.2 },
-  ], []);
+  // 장소 상세 모달 상태
+  const [placeDetailModal, setPlaceDetailModal] = useState(null); // 선택된 장소의 상세 정보
+  
+  // 카테고리별 Google Places 타입 매핑
+  const categoryToPlaceTypes = {
+    '명소': ['tourist_attraction', 'museum', 'art_gallery', 'amusement_park', 'zoo', 'aquarium'],
+    '식당': ['restaurant', 'meal_takeaway', 'meal_delivery'],
+    '카페': ['cafe', 'bakery', 'coffee_shop']
+  };
+  
+  // 카테고리별 타입에서 한글 카테고리로 역매핑 (현재는 사용하지 않지만 나중에 필요할 수 있음)
+  // const getKoreanCategory = (types) => {
+  //   if (!Array.isArray(types)) return '명소';
+  //   
+  //   const typeSet = new Set(types);
+  //   
+  //   // 카페 체크
+  //   if (categoryToPlaceTypes['카페'].some(t => typeSet.has(t))) {
+  //     return '카페';
+  //   }
+  //   // 식당 체크
+  //   if (categoryToPlaceTypes['식당'].some(t => typeSet.has(t))) {
+  //     return '식당';
+  //   }
+  //   // 명소 체크 (기본값)
+  //   return '명소';
+  // };
+  
+  // 도시의 모든 카테고리 장소 가져오기 (각 카테고리별로 30개씩)
+  const fetchAllPlaces = async () => {
+    if (!selectedDestination.lat || !selectedDestination.lng) {
+      return;
+    }
+    
+    setPlacesLoading(true);
+    try {
+      const allPlaces = [];
+      
+      // 각 카테고리별로 순차적으로 요청
+      for (const [categoryName, types] of Object.entries(categoryToPlaceTypes)) {
+        try {
+          const res = await fetch('/api/places/nearby', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              latitude: selectedDestination.lat,
+              longitude: selectedDestination.lng,
+              radius: 50000, // 50km
+              categories: types
+            })
+          });
+          
+          if (!res.ok) {
+            console.warn(`${categoryName} 카테고리 검색 실패: HTTP ${res.status}`);
+            continue;
+          }
+          
+          const data = await res.json();
+          const places = data.places || [];
+          
+          // 데이터 변환 (각 카테고리별로 명시적으로 카테고리 설정)
+          const transformed = places.map((place, index) => {
+            const displayName = place.displayName?.text || place.displayName || '이름 없음';
+            const address = place.formattedAddress || '주소 정보 없음';
+            const lat = place.location?.latitude;
+            const lng = place.location?.longitude;
+            const rating = place.rating || 0;
+            const userRatingCount = place.userRatingCount || 0;
+            const photos = place.photos || [];
+            const firstPhoto = photos.length > 0 ? photos[0].name : null;
+            const editorialSummary = place.editorialSummary?.text || place.editorialSummary || '';
+            
+            // 사진 URL 생성
+            let image = null;
+            if (firstPhoto) {
+              image = `/api/places/photo?name=${encodeURIComponent(firstPhoto)}&maxWidth=200`;
+            }
+            
+            return {
+              id: place.id || `place-${categoryName}-${index}`,
+              name: displayName,
+              category: categoryName, // 요청한 카테고리를 직접 사용
+              address,
+              image,
+              likes: userRatingCount,
+              rating: rating,
+              lat,
+              lng,
+              description: editorialSummary,
+            };
+          });
+          
+          allPlaces.push(...transformed);
+        } catch (err) {
+          console.error(`${categoryName} 카테고리 검색 오류:`, err);
+        }
+      }
+      
+      setAllPlaces(allPlaces);
+    } catch (err) {
+      console.error('Place fetch error:', err);
+      alert('장소 정보를 가져오는데 실패했습니다.');
+      setAllPlaces([]);
+    } finally {
+      setPlacesLoading(false);
+    }
+  };
   
   // 카테고리 필터링된 장소 목록
   const filteredPlaces = useMemo(() => {
-    if (selectedCategory === 'all') return mockPlaces;
-    return mockPlaces.filter(p => {
-      if (selectedCategory === '명소') return p.category === '명소';
-      if (selectedCategory === '식당') return p.category === '식당';
-      if (selectedCategory === '카페') return p.category === '카페';
-      return true;
-    });
-  }, [selectedCategory, mockPlaces]);
+    if (selectedCategory === 'all') return allPlaces;
+    return allPlaces.filter(p => p.category === selectedCategory);
+  }, [selectedCategory, allPlaces]);
   
   // 검색어 필터링
   const searchFilteredPlaces = useMemo(() => {
@@ -359,6 +450,29 @@ const TripPlanPageEx1 = () => {
   // 선택된 장소 제거
   const removeSelectedPlace = (placeId) => {
     setSelectedPlaces(prev => prev.filter(p => p.id !== placeId));
+  };
+  
+  // 선택된 장소의 체류 시간 업데이트 (총 여행 시간 초과 방지)
+  const updatePlaceStayTime = (placeId, hours, minutes) => {
+    // 현재 장소를 제외한 다른 장소들의 총 시간 계산
+    const otherPlacesTotalMinutes = selectedPlaces
+      .filter(p => p.id !== placeId)
+      .reduce((sum, p) => sum + (p.stayHours || 0) * 60 + (p.stayMinutes || 0), 0);
+    
+    const newPlaceMinutes = hours * 60 + minutes;
+    const totalTravelMinutes = calculateTotalTravelTime();
+    
+    // 총 시간 초과 체크
+    if (otherPlacesTotalMinutes + newPlaceMinutes > totalTravelMinutes) {
+      alert(`총 여행 시간(${formatTotalTravelTime()})을 초과할 수 없습니다.`);
+      return;
+    }
+    
+    setSelectedPlaces(prev => prev.map(p => 
+      p.id === placeId 
+        ? { ...p, stayHours: hours, stayMinutes: minutes }
+        : p
+    ));
   };
   
   // 총 소요 시간 계산
@@ -530,10 +644,17 @@ const TripPlanPageEx1 = () => {
     const [isComposing, setIsComposing] = useState(false);
     const [compositionValue, setCompositionValue] = useState('');
 
+    // 컴포넌트 마운트 시 장소 데이터 가져오기
+    useEffect(() => {
+      if (selectedDestination.lat && selectedDestination.lng && allPlaces.length === 0) {
+        fetchAllPlaces();
+      }
+    }, []); // fetchAllPlaces는 stable하므로 의존성 배열에 포함하지 않음
+
     return (
-      <div className="flex flex-col min-[500px]:flex-row gap-6 w-full">
+      <div className="flex flex-row gap-6 w-full">
         {/* Left Pane: 장소 선택 폼 + 선택된 장소 목록 */}
-        <div className="min-[500px]:w-[450px] w-full flex flex-col gap-6">
+        <div className="w-[450px] flex flex-col gap-6">
           {/* 장소 선택 폼 */}
           <div className="bg-white p-6 rounded-lg shadow-md text-left">
             {/* 헤더 */}
@@ -607,10 +728,26 @@ const TripPlanPageEx1 = () => {
             
             {/* 장소 목록 */}
             <div className="space-y-3 max-h-[350px] overflow-y-auto">
-              {searchFilteredPlaces.map((place) => {
+              {placesLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                  <span>인기 장소를 불러오는 중...</span>
+                  <span className="text-xs text-gray-400 mt-1">최대 30개의 장소를 가져옵니다</span>
+                </div>
+              ) : searchFilteredPlaces.length === 0 ? (
+                <div className="text-center text-gray-400 py-12">
+                  <div className="text-lg mb-2">😔</div>
+                  <div>검색 결과가 없습니다.</div>
+                </div>
+              ) : (
+                searchFilteredPlaces.map((place) => {
                 const isSelected = selectedPlaces.some(p => p.id === place.id);
                 return (
-                  <div key={place.id} className="flex gap-3 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                  <div 
+                    key={place.id} 
+                    className="flex gap-3 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors cursor-pointer"
+                    onClick={() => setPlaceDetailModal(place)}
+                  >
                     {/* 썸네일 */}
                     <img 
                       src={place.image} 
@@ -627,7 +764,7 @@ const TripPlanPageEx1 = () => {
                     
                     {/* 정보 */}
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-800 mb-1 truncate">{place.name}</div>
+                      <div className="font-semibold text-gray-800 mb-1 line-clamp-2">{place.name}</div>
                       <div className="text-xs text-gray-500 mb-1">
                         <span className="text-blue-600">{place.category}</span>
                         {' · '}
@@ -651,7 +788,10 @@ const TripPlanPageEx1 = () => {
 
                     {/* 선택 버튼 */}
                     <button
-                      onClick={() => togglePlaceSelection(place)}
+                      onClick={(e) => {
+                        e.stopPropagation(); // 모달 열림 방지
+                        togglePlaceSelection(place);
+                      }}
                       className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
                         isSelected
                           ? 'bg-blue-600 text-white'
@@ -668,11 +808,12 @@ const TripPlanPageEx1 = () => {
                         </svg>
                       )}
                     </button>
-                  </div>
+              </div>
                 );
-              })}
-            </div>
-          </div>
+              })
+              )}
+                      </div>
+                      </div>
 
           {/* 선택된 장소 목록 */}
           <div className="bg-white p-6 rounded-lg shadow-md flex flex-col">
@@ -680,7 +821,7 @@ const TripPlanPageEx1 = () => {
               <div className="text-sm text-gray-600">
                 <span className="font-semibold text-gray-800">{selectedPlaces.length}</span>개 장소 · {' '}
                 <span className="font-semibold text-gray-800">{totalTime.hours}시간 {totalTime.minutes}분</span>
-                {' '}/ 60시간 0분
+                {' '}/ {formatTotalTravelTime()}
               </div>
               <button 
                 onClick={() => setSelectedPlaces([])}
@@ -700,15 +841,41 @@ const TripPlanPageEx1 = () => {
                       {index + 1}
                       </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-800 mb-1 truncate">{place.name}</div>
+                      <div className="font-medium text-gray-800 mb-1 line-clamp-2">{place.name}</div>
                       <div className="text-xs text-gray-500">
                         <span className="text-blue-600">{place.category}</span>
                         {' · '}
                         <span className="truncate">{place.address}</span>
                     </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {place.stayHours || 2}시간 {place.stayMinutes || 0}분
-            </div>
+                      {/* 체류 시간 선택 */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <select
+                          value={place.stayHours || 2}
+                          onChange={(e) => {
+                            const hours = parseInt(e.target.value);
+                            updatePlaceStayTime(place.id, hours, place.stayMinutes || 0);
+                          }}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          {[...Array(13)].map((_, i) => (
+                            <option key={i} value={i}>{i}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-500">시간</span>
+                        <select
+                          value={place.stayMinutes || 0}
+                          onChange={(e) => {
+                            const minutes = parseInt(e.target.value);
+                            updatePlaceStayTime(place.id, place.stayHours || 2, minutes);
+                          }}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <span className="text-xs text-gray-500">분</span>
+                      </div>
         </div>
                     <button
                       onClick={() => removeSelectedPlace(place.id)}
@@ -740,6 +907,117 @@ const TripPlanPageEx1 = () => {
             <button onClick={() => setStep(3)} className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">다음</button>
           </div>
       </div>
+
+      {/* 장소 상세 정보 모달 */}
+      {placeDetailModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" onClick={() => setPlaceDetailModal(null)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+            {/* 모달 헤더 */}
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-800">장소 정보</h3>
+              <button 
+                onClick={() => setPlaceDetailModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 모달 본문 */}
+            <div className="p-6">
+              {/* 이미지 */}
+              {placeDetailModal.image && (
+                <div className="mb-4">
+                  <img 
+                    src={placeDetailModal.image.replace('maxWidth=200', 'maxWidth=600')} 
+                    alt={placeDetailModal.name}
+                    className="w-full h-64 object-cover rounded-lg"
+                    onError={(e) => {
+                      if (!e.target.src.startsWith('data:')) {
+                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjIwIiBmaWxsPSIjOWM5OWMzIiBkeT0iLjNlbSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* 기본 정보 */}
+              <div className="mb-4">
+                <h4 className="text-2xl font-bold text-gray-800 mb-2">{placeDetailModal.name}</h4>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
+                    {placeDetailModal.category}
+                  </span>
+                </div>
+                <p className="text-gray-600 text-sm flex items-start gap-2">
+                  <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span>{placeDetailModal.address}</span>
+                </p>
+              </div>
+
+              {/* 평점 정보 */}
+              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-200">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  <span className="text-lg font-semibold text-gray-800">{placeDetailModal.rating}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-gray-600">{placeDetailModal.likes} 리뷰</span>
+                </div>
+              </div>
+
+              {/* 설명 */}
+              {placeDetailModal.description ? (
+                <div className="mb-6">
+                  <h5 className="text-lg font-semibold text-gray-800 mb-2">장소 소개</h5>
+                  <p className="text-gray-600 leading-relaxed">{placeDetailModal.description}</p>
+                </div>
+              ) : (
+                <div className="mb-6">
+                  <p className="text-gray-400 text-sm italic">이 장소에 대한 설명이 제공되지 않았습니다.</p>
+                </div>
+              )}
+
+              {/* 액션 버튼 */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const isSelected = selectedPlaces.some(p => p.id === placeDetailModal.id);
+                    if (!isSelected) {
+                      togglePlaceSelection(placeDetailModal);
+                    }
+                    setPlaceDetailModal(null);
+                  }}
+                  className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
+                    selectedPlaces.some(p => p.id === placeDetailModal.id)
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                  disabled={selectedPlaces.some(p => p.id === placeDetailModal.id)}
+                >
+                  {selectedPlaces.some(p => p.id === placeDetailModal.id) ? '이미 선택됨' : '일정에 추가'}
+                </button>
+                <button
+                  onClick={() => setPlaceDetailModal(null)}
+                  className="px-6 py-3 rounded-lg border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  닫기
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   };
@@ -867,17 +1145,19 @@ const TripPlanPageEx1 = () => {
 export default TripPlanPageEx1;
 
 // ===== Presentational Components (분리) =====
-function HeaderView({ step }) {
+function HeaderView() {
   return (
-    <div className="text-center mb-8">
-      <h1 className="text-3xl md:text-4xl font-bold text-gray-800">여행 일정 생성</h1>
-      <p className="text-gray-600 mt-2">공통 정보 입력 → 모드 선택 → 분기 플로우 → 확인/저장</p>
-      <div className="flex items-center justify-center gap-2 mt-4">
-        {[0, 1, 2, 3].map((s) => (
-          <div key={s} className={`w-3 h-3 rounded-full ${step === s ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
-        ))}
-      </div>
-    </div>
+    // 노트북 화면 작아서 주석처리
+    null
+    // <div className="text-center mb-8">
+    //   <h1 className="text-3xl md:text-4xl font-bold text-gray-800">여행 일정 생성</h1>
+    //   <p className="text-gray-600 mt-2">공통 정보 입력 → 모드 선택 → 분기 플로우 → 확인/저장</p>
+    //   <div className="flex items-center justify-center gap-2 mt-4">
+    //     {[0, 1, 2, 3].map((s) => (
+    //       <div key={s} className={`w-3 h-3 rounded-full ${step === s ? 'bg-blue-600' : 'bg-gray-300'}`}></div>
+    //     ))}
+    //   </div>
+    // </div>
   );
 }
 
@@ -935,7 +1215,7 @@ function CommonFormView({ state, handlers }) {
             <button
               type="button"
               onClick={handleSearchCity}
-              className="px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              className="px-4 py-3 rounded-lg bg-sky-400 hover:bg-sky-500 text-white font-semibold"
             >
               찾기
             </button>
@@ -1044,9 +1324,9 @@ function CommonFormView({ state, handlers }) {
                             onChange={(e) => updateDailyTime(dateKey, 'startTime', e.target.value)}
                             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
                           />
-                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {/* <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                          </svg> */}
         </div>
                       </td>
                       <td className="border border-gray-300 px-4 py-3">
@@ -1057,9 +1337,9 @@ function CommonFormView({ state, handlers }) {
                             onChange={(e) => updateDailyTime(dateKey, 'endTime', e.target.value)}
                             className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm"
                           />
-                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          {/* <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                          </svg> */}
         </div>
                       </td>
                     </tr>
@@ -1069,12 +1349,8 @@ function CommonFormView({ state, handlers }) {
             </table>
         </div>
 
-          <div className="mt-4">
-            <button className="w-full md:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md">
-              설정 완료
-            </button>
+         
       </div>
-        </div>
       )}
 
       <div className="flex justify-end mt-6">
@@ -1091,7 +1367,7 @@ function CommonFormView({ state, handlers }) {
             setMode('direct');
             setStep(2);
           }}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md"
+          className="bg-sky-400 hover:bg-sky-500 text-white font-semibold py-3 px-6 rounded-lg shadow-md"
         >
           다음
         </button>

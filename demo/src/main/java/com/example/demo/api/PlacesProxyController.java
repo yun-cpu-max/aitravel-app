@@ -385,6 +385,118 @@ public class PlacesProxyController {
                 .header("Cache-Control", "public, max-age=86400")
                 .build();
     }
+
+    /**
+     * 도시 내 명소, 카페, 음식점 등을 카테고리별로 검색하고, 리뷰 많고 평점 높은 순으로 최대 30개 가져옵니다.
+     * - Google Places API (New) - Nearby Search 사용
+     * - 내부적으로 페이지네이션을 처리하여 최대 30개 결과를 반환합니다.
+     *
+     * @param requestBody 검색 요청 본문 (예: { "latitude": 35.6895, "longitude": 139.6917, "radius": 50000, "categories": ["restaurant", "cafe", "tourist_attraction"] })
+     * @return 검색 결과 목록 (최대 30개)
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/nearby")
+    public ResponseEntity<?> searchNearby(@org.springframework.web.bind.annotation.RequestBody Map<String, Object> requestBody) {
+        Object latObj = requestBody.get("latitude");
+        Object lngObj = requestBody.get("longitude");
+        Object radiusObj = requestBody.get("radius");
+        Object categoriesObj = requestBody.get("categories");
+
+        if (latObj == null || lngObj == null || radiusObj == null || categoriesObj == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "위도, 경도, 반경, 카테고리는 필수입니다."));
+        }
+
+        Double latitude = latObj instanceof Number ? ((Number) latObj).doubleValue() : null;
+        Double longitude = lngObj instanceof Number ? ((Number) lngObj).doubleValue() : null;
+        Integer radius = radiusObj instanceof Number ? ((Number) radiusObj).intValue() : null;
+        
+        if (latitude == null || longitude == null || radius == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "위도, 경도, 반경은 숫자여야 합니다."));
+        }
+
+        java.util.List<String> categories;
+        if (categoriesObj instanceof java.util.List) {
+            categories = (java.util.List<String>) categoriesObj;
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("message", "카테고리는 리스트여야 합니다."));
+        }
+
+        if (categories.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "최소 하나의 카테고리가 필요합니다."));
+        }
+
+        java.util.List<Map<String, Object>> allPlaces = new java.util.ArrayList<>();
+        String nextPageToken = null;
+        int resultsToFetch = 30;
+        int fetchedCount = 0;
+
+        do {
+            String url = "https://places.googleapis.com/v1/places:searchNearby";
+
+            java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+            body.put("languageCode", lang);
+            body.put("maxResultCount", Math.min(20, resultsToFetch - fetchedCount));
+
+            java.util.Map<String, Object> circle = Map.of(
+                    "center", Map.of("latitude", latitude, "longitude", longitude),
+                    "radius", (double) radius
+            );
+            body.put("locationRestriction", Map.of("circle", circle));
+            body.put("includedTypes", categories);
+            body.put("rankPreference", "POPULARITY");
+
+            if (nextPageToken != null && !nextPageToken.isEmpty()) {
+                body.put("pageToken", nextPageToken);
+            }
+
+            String fieldMask = "places.id,places.displayName,places.formattedAddress,places.photos,places.location,places.editorialSummary,places.rating,places.userRatingCount,places.types,places.primaryType";
+
+            try {
+                ResponseEntity<Map> response = restClient.post()
+                        .uri(URI.create(url))
+                        .header("X-Goog-Api-Key", apiKey)
+                        .header("X-Goog-FieldMask", fieldMask)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .body(body)
+                        .retrieve()
+                        .toEntity(Map.class);
+
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    Object placesObj = response.getBody().get("places");
+                    if (placesObj instanceof java.util.List) {
+                        java.util.List<Map<String, Object>> places = (java.util.List<Map<String, Object>>) placesObj;
+                        for (Map<String, Object> place : places) {
+                            if (fetchedCount < resultsToFetch) {
+                                allPlaces.add(place);
+                                fetchedCount++;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                    nextPageToken = (String) response.getBody().get("nextPageToken");
+                } else {
+                    nextPageToken = null;
+                }
+
+            } catch (org.springframework.web.client.RestClientResponseException e) {
+                org.springframework.http.HttpStatusCode statusCode = e.getStatusCode();
+                String responseBody = e.getResponseBodyAsString(java.nio.charset.StandardCharsets.UTF_8);
+                return ResponseEntity.status(statusCode != null ? statusCode : org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(java.util.Map.of(
+                                "message", "Google API 오류",
+                                "status", statusCode != null ? statusCode.value() : 500,
+                                "response", responseBody
+                        ));
+            } catch (Exception e) {
+                return ResponseEntity.status(500).body(java.util.Map.of(
+                        "message", "장소 검색에 실패했습니다.",
+                        "detail", e.getMessage()
+                ));
+            }
+        } while (nextPageToken != null && fetchedCount < resultsToFetch);
+
+        return ResponseEntity.ok(Map.of("places", allPlaces, "total", allPlaces.size()));
+    }
 }
 
 

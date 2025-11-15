@@ -118,6 +118,16 @@ const ProfilePage = () => {
             preferredAccommodationType: data.preferredAccommodationType || '',
             preferredTransportation: data.preferredTransportation || ''
           });
+        } else if (response.status === 404) {
+          // 취향 정보가 없는 신규 사용자는 기본값으로 처리 (에러 아님)
+          console.log('취향 정보가 없습니다. 기본값을 사용합니다.');
+          setTravelPreferences({
+            travelStyle: '',
+            budgetRangeMin: '',
+            budgetRangeMax: '',
+            preferredAccommodationType: '',
+            preferredTransportation: ''
+          });
         } else {
           const errorText = await response.text();
           console.error('취향 로드 실패:', errorText);

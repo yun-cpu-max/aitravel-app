@@ -39,8 +39,9 @@ public class User {
     /**
      * @Column: 컬럼명을 password_hash로 지정
      * 실제 DB에는 해시된 비밀번호만 저장 (보안)
+     * nullable = true: OAuth 로그인 사용자는 비밀번호가 없음
      */
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = true, length = 255)
     private String passwordHash;
 
     /** 사용자 표시 이름 (실제 이름) */
