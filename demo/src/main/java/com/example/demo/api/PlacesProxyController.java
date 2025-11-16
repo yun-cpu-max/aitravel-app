@@ -497,6 +497,85 @@ public class PlacesProxyController {
 
         return ResponseEntity.ok(Map.of("places", allPlaces, "total", allPlaces.size()));
     }
+
+    /**
+     * 텍스트 기반 장소 검색 (사용자가 직접 장소명을 입력해서 검색)
+     * - Google Places API (New) - Text Search 사용
+     * - 특정 지역 근처에서 텍스트로 장소를 검색합니다.
+     *
+     * @param requestBody 검색 요청 본문 (예: { "query": "에펠탑", "latitude": 48.8566, "longitude": 2.3522 })
+     * @return 검색 결과 목록
+     */
+    @org.springframework.web.bind.annotation.PostMapping("/textsearch")
+    public ResponseEntity<?> searchByText(@org.springframework.web.bind.annotation.RequestBody Map<String, Object> requestBody) {
+        Object queryObj = requestBody.get("query");
+        Object latObj = requestBody.get("latitude");
+        Object lngObj = requestBody.get("longitude");
+
+        if (queryObj == null || !(queryObj instanceof String) || ((String) queryObj).trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "검색어(query)는 필수입니다."));
+        }
+
+        String query = ((String) queryObj).trim();
+        Double latitude = latObj instanceof Number ? ((Number) latObj).doubleValue() : null;
+        Double longitude = lngObj instanceof Number ? ((Number) lngObj).doubleValue() : null;
+
+        String url = "https://places.googleapis.com/v1/places:searchText";
+
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("textQuery", query);
+        body.put("languageCode", lang);
+        body.put("maxResultCount", 20);
+
+        // 위경도가 제공되면 해당 지역 근처로 검색 제한
+        if (latitude != null && longitude != null) {
+            java.util.Map<String, Object> circle = Map.of(
+                    "center", Map.of("latitude", latitude, "longitude", longitude),
+                    "radius", 50000.0 // 50km
+            );
+            body.put("locationBias", Map.of("circle", circle));
+        }
+
+        String fieldMask = "places.id,places.displayName,places.formattedAddress,places.photos,places.location,places.editorialSummary,places.rating,places.userRatingCount,places.types,places.primaryType";
+
+        try {
+            ResponseEntity<Map> response = restClient.post()
+                    .uri(URI.create(url))
+                    .header("X-Goog-Api-Key", apiKey)
+                    .header("X-Goog-FieldMask", fieldMask)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toEntity(Map.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                Object placesObj = response.getBody().get("places");
+                java.util.List<Map<String, Object>> places = placesObj instanceof java.util.List 
+                    ? (java.util.List<Map<String, Object>>) placesObj 
+                    : new java.util.ArrayList<>();
+                
+                return ResponseEntity.ok(Map.of("places", places, "total", places.size()));
+            } else {
+                return ResponseEntity.status(response.getStatusCode())
+                        .body(Map.of("message", "Google API에서 응답이 없습니다.", "places", java.util.List.of()));
+            }
+
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            org.springframework.http.HttpStatusCode statusCode = e.getStatusCode();
+            String responseBody = e.getResponseBodyAsString(java.nio.charset.StandardCharsets.UTF_8);
+            return ResponseEntity.status(statusCode != null ? statusCode : org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of(
+                            "message", "Google API 오류",
+                            "status", statusCode != null ? statusCode.value() : 500,
+                            "response", responseBody
+                    ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(java.util.Map.of(
+                    "message", "텍스트 검색에 실패했습니다.",
+                    "detail", e.getMessage()
+            ));
+        }
+    }
 }
 
 
