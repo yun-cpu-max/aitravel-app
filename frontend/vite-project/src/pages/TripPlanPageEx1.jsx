@@ -650,6 +650,9 @@ const TripPlanPageEx1 = () => {
     const [directQuery, setDirectQuery] = useState('');
     const [searchQuery, setSearchQuery] = useState(''); // 실제 검색에 사용되는 쿼리 (엔터 시)
     
+    // 선택된 장소 패널 토글 상태
+    const [selectedPanelOpen, setSelectedPanelOpen] = useState(true);
+    
     // 검색어 필터링 (엔터를 눌렀을 때만 적용)
     const searchFilteredPlaces = useMemo(() => {
       if (!searchQuery.trim()) return filteredPlaces;
@@ -668,14 +671,71 @@ const TripPlanPageEx1 = () => {
     }, []); // fetchAllPlaces는 stable하므로 의존성 배열에 포함하지 않음
 
     return (
-      <div className="flex flex-row gap-6 w-full">
-        {/* Left Pane: 장소 선택 폼 + 선택된 장소 목록 */}
-        <div className="w-[450px] flex flex-col gap-6">
-          {/* 장소 선택 폼 */}
-          <div className="bg-white p-6 rounded-lg shadow-md text-left">
+      <div className="relative w-full h-screen">
+        {/* 배경 지도 (전체 화면) */}
+        <div className="absolute inset-0">
+          <DirectSearchMap
+            centerLat={selectedDestination.lat}
+            centerLng={selectedDestination.lng}
+            selectedPlaces={selectedPlaces}
+          />
+        </div>
+
+        {/* 왼쪽 단계 표시 영역 - 마이로 스타일 */}
+        <div className="absolute left-0 top-0 bottom-0 w-[110px] bg-white shadow-lg flex flex-col z-10 border-r border-gray-200">
+          {/* 단계 목록 */}
+          <div className="flex-1 pt-8 pb-4">
+            <div className="space-y-1">
+              {/* STEP 1: 도시 선택 */}
+              <div className={`px-3 py-4 ${step === 0 ? 'bg-cyan-50 border-l-4 border-cyan-400' : ''}`}>
+                <div className="text-xs text-gray-500 mb-1">STEP 1</div>
+                <div className={`text-sm font-semibold ${step === 0 ? 'text-cyan-600' : 'text-gray-700'}`}>
+                  도시 선택
+                </div>
+              </div>
+
+              {/* STEP 2: 장소 선택 */}
+              <div className={`px-3 py-4 ${step === 2 ? 'bg-cyan-50 border-l-4 border-cyan-400' : ''}`}>
+                <div className="text-xs text-gray-500 mb-1">STEP 2</div>
+                <div className={`text-sm font-semibold ${step === 2 ? 'text-cyan-600' : 'text-gray-700'}`}>
+                  장소 선택
+                </div>
+              </div>
+
+              {/* STEP 3: 숙소 선택 */}
+              <div className={`px-3 py-4 ${step === 3 ? 'bg-cyan-50 border-l-4 border-cyan-400' : ''}`}>
+                <div className="text-xs text-gray-500 mb-1">STEP 3</div>
+                <div className={`text-sm font-semibold ${step === 3 ? 'text-cyan-600' : 'text-gray-700'}`}>
+                  숙소 선택
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 하단 버튼 */}
+          <div className="p-3 space-y-2 border-t border-gray-200">
+            <button 
+              onClick={() => setStep(0)} 
+              className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-medium transition-colors"
+            >
+              이전
+            </button>
+            <button 
+              onClick={() => setStep(3)} 
+              className="w-full px-3 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-semibold transition-colors"
+            >
+              다음
+            </button>
+          </div>
+        </div>
+
+        {/* Unified Panel: 장소 선택 + 선택된 장소 (하나의 패널) */}
+        <div className="absolute left-[110px] top-0 bottom-0 flex gap-0 z-10">
+          {/* 왼쪽: 장소 선택 영역 */}
+          <div className="w-[400px] bg-white shadow-2xl text-left flex flex-col h-full">
             {/* 헤더 */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+            <div className="p-4 pb-3 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-2xl font-bold text-gray-800 mb-1">
                 {selectedDestination.name || '여행지'}
               </h2>
               <div className="text-base text-gray-600">
@@ -689,51 +749,52 @@ const TripPlanPageEx1 = () => {
               </div>
             </div>
             
-            {/* 검색창 */}
-        <div className="mb-4">
-              <div className="relative">
+            {/* 검색창 및 카테고리 */}
+            <div className="p-3 pb-2 border-b border-gray-200 flex-shrink-0">
+              {/* 검색창 */}
+              <div className="mb-2">
+                <div className="relative">
                 <input
-                  type="text"
-                  value={directQuery}
+                    type="text"
+                    value={directQuery}
                   onChange={(e) => {
-                    setDirectQuery(e.target.value);
-                  }}
-                  onCompositionStart={() => {
-                    setIsComposing(true);
-                  }}
-                  onCompositionEnd={() => {
-                    setIsComposing(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !isComposing) {
-                      setSearchQuery(directQuery);
-                    }
-                  }}
-                  placeholder="장소명을 입력하세요 (엔터로 검색)"
-                  className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
-                <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                      setDirectQuery(e.target.value);
+                    }}
+                    onCompositionStart={() => {
+                      setIsComposing(true);
+                    }}
+                    onCompositionEnd={() => {
+                      setIsComposing(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isComposing) {
+                        setSearchQuery(directQuery);
+                      }
+                    }}
+                    placeholder="장소명 검색"
+                    className="w-full px-3 py-2.5 pl-10 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-              <div className="mt-2">
-                <button 
-                  onClick={() => setPlaceRegistrationModal(true)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
-                >
-                  찾으시는 장소가 없나요?
-                </button>
-          </div>
-        </div>
+                <div className="mt-1">
+                  <button 
+                    onClick={() => setPlaceRegistrationModal(true)}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    찾으시는 장소가 없나요?
+                  </button>
+                </div>
+              </div>
 
-            {/* 카테고리 필터 */}
-        <div className="mb-4">
-                <div className="flex gap-2">
+              {/* 카테고리 필터 */}
+              <div className="flex gap-1">
                 {['all', '명소', '식당', '카페'].map((cat) => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex-1 px-2 py-2 rounded text-xs font-medium transition-colors ${
                       selectedCategory === cat
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -741,209 +802,257 @@ const TripPlanPageEx1 = () => {
                   >
                     {cat === 'all' ? '전체' : cat}
                   </button>
-                  ))}
-                </div>
-              </div>
-            
-            {/* 장소 목록 */}
-            <div className="space-y-3 max-h-[350px] overflow-y-auto">
-              {placesLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
-                  <span>인기 장소를 불러오는 중...</span>
-                  <span className="text-xs text-gray-400 mt-1">최대 30개의 장소를 가져옵니다</span>
-                </div>
-              ) : searchFilteredPlaces.length === 0 ? (
-                <div className="text-center text-gray-400 py-12">
-                  <div className="text-lg mb-2">😔</div>
-                  <div>검색 결과가 없습니다.</div>
-                </div>
-              ) : (
-                searchFilteredPlaces.map((place) => {
-                const isSelected = selectedPlaces.some(p => p.id === place.id);
-                return (
-                  <div 
-                    key={place.id} 
-                    className="flex gap-3 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors cursor-pointer min-h-[100px]"
-                    onClick={() => setPlaceDetailModal(place)}
-                  >
-                    {/* 썸네일 */}
-                    <img 
-                      src={place.image} 
-                      alt={place.name}
-                      className="w-16 h-16 object-cover rounded bg-gray-200 flex-shrink-0"
-                      onError={(e) => {
-                        // 무한 루프 방지: 이미 fallback이면 다시 설정하지 않음
-                        if (!e.target.src.startsWith('data:')) {
-                          // 데이터 URI로 빈 회색 이미지 생성
-                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
-                        }
-                      }}
-                    />
-                    
-                    {/* 정보 */}
-                    <div className="flex-1 min-w-0 flex flex-col justify-between">
-                <div>
-                        <div className="font-semibold text-gray-800 mb-1" style={{ 
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          wordBreak: 'break-word',
-                          height: '2.5rem',
-                          lineHeight: '1.25rem'
-                        }}>{place.name}</div>
-                        <div className="text-xs text-gray-500 mb-1 truncate">
-                          <span className="text-blue-600">{place.category}</span>
-                          {' · '}
-                          <span>{place.address}</span>
-                </div>
-                </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-400">
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                          </svg>
-                          <span>{place.likes}</span>
-              </div>
-                        <div className="flex items-center gap-1">
-                          <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                          <span>{place.rating}</span>
-                        </div>
+            ))}
           </div>
         </div>
 
-                    {/* 선택 버튼 */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation(); // 모달 열림 방지
-                        togglePlaceSelection(place);
-                      }}
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                      }`}
-                    >
-                      {isSelected ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                      )}
-                    </button>
-              </div>
-                );
-              })
-              )}
-                      </div>
-                      </div>
-
-          {/* 선택된 장소 목록 */}
-          <div className="bg-white p-6 rounded-lg shadow-md flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-semibold text-gray-800">{selectedPlaces.length}</span>개 장소 · {' '}
-                <span className="font-semibold text-gray-800">{totalTime.hours}시간 {totalTime.minutes}분</span>
-                {' '}/ {formatTotalTravelTime()}
-              </div>
-              <button 
-                onClick={() => setSelectedPlaces([])}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                장소 설정 초기화
-              </button>
-                      </div>
-            
-            <div className="space-y-3 max-h-[350px] overflow-y-auto">
-              {selectedPlaces.length === 0 ? (
-                <div className="text-center text-gray-400 py-8">선택된 장소가 없습니다.</div>
-              ) : (
-                selectedPlaces.map((place, index) => (
-                  <div key={place.id} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
-                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">
-                      {index + 1}
-                      </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-800 mb-1" style={{ 
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        wordBreak: 'break-word',
-                        minHeight: '2.5rem',
-                        lineHeight: '1.25rem'
-                      }}>{place.name}</div>
-                      <div className="text-xs text-gray-500">
-                        <span className="text-blue-600">{place.category}</span>
-                        {' · '}
-                        <span className="truncate">{place.address}</span>
-                    </div>
-                      {/* 체류 시간 선택 */}
-                      <div className="flex items-center gap-2 mt-2">
-                        <select
-                          value={place.stayHours || 2}
-                          onChange={(e) => {
-                            const hours = parseInt(e.target.value);
-                            updatePlaceStayTime(place.id, hours, place.stayMinutes || 0);
-                          }}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        >
-                          {[...Array(13)].map((_, i) => (
-                            <option key={i} value={i}>{i}</option>
-                          ))}
-                        </select>
-                        <span className="text-xs text-gray-500">시간</span>
-                        <select
-                          value={place.stayMinutes || 0}
-                          onChange={(e) => {
-                            const minutes = parseInt(e.target.value);
-                            updatePlaceStayTime(place.id, place.stayHours || 2, minutes);
-                          }}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        >
-                          {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
-                        <span className="text-xs text-gray-500">분</span>
-                      </div>
-        </div>
-                    <button
-                      onClick={() => removeSelectedPlace(place.id)}
-                      className="flex-shrink-0 w-6 h-6 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
+            {/* 장소 목록 (스크롤 영역) */}
+            <div className="flex-1 overflow-y-auto px-3 py-2">
+              <div className="space-y-1.5">
+                {placesLoading ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                    <span className="text-sm">장소 로딩 중...</span>
                   </div>
-                ))
-              )}
+                ) : searchFilteredPlaces.length === 0 ? (
+                  <div className="text-center text-gray-400 py-8">
+                    <div className="text-base mb-1">😔</div>
+                    <div className="text-sm">검색 결과가 없습니다.</div>
+                  </div>
+                ) : (
+                  searchFilteredPlaces.map((place) => {
+                    const isSelected = selectedPlaces.some(p => p.id === place.id);
+                    return (
+                      <div 
+                        key={place.id} 
+                        className="flex gap-2.5 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors cursor-pointer bg-white"
+                        onClick={() => setPlaceDetailModal(place)}
+                      >
+                        {/* 썸네일 */}
+                        <img 
+                          src={place.image} 
+                          alt={place.name}
+                          className="w-16 h-16 object-cover rounded bg-gray-200 flex-shrink-0"
+                          onError={(e) => {
+                            if (!e.target.src.startsWith('data:')) {
+                              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                            }
+                          }}
+                        />
+                        
+                        {/* 정보 */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                <div>
+                            <div className="font-semibold text-sm text-gray-800 mb-1" style={{ 
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                              wordBreak: 'break-word',
+                              lineHeight: '1.2rem',
+                              maxHeight: '2.4rem'
+                            }}>{place.name}</div>
+                            <div className="text-xs text-gray-500 truncate mb-1">
+                              <span className="text-blue-600">{place.category}</span>
+                              {place.address && (
+                                <>
+                                  {' · '}
+                                  <span>{place.address}</span>
+                                </>
+                              )}
+                </div>
+                </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <div className="flex items-center gap-0.5">
+                              <svg className="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                              </svg>
+                              <span>{place.likes}</span>
+              </div>
+                            <div className="flex items-center gap-0.5">
+                              <svg className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                              <span>{place.rating}</span>
+                            </div>
+          </div>
+        </div>
+
+                        {/* 선택 버튼 */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePlaceSelection(place);
+                          }}
+                          className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }`}
+                        >
+                          {isSelected ? (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                          )}
+                        </button>
+              </div>
+                    );
+                  })
+                )}
                       </div>
                       </div>
                     </div>
 
-        {/* Right Pane: 지도 */}
-        <div className="flex-1 flex flex-col gap-6">
-          {/* 지도 */}
-          <DirectSearchMap
-            centerLat={selectedDestination.lat}
-            centerLng={selectedDestination.lng}
-            selectedPlaces={selectedPlaces}
-          />
-          
-          {/* 하단 버튼 */}
-          <div className="flex justify-between">
-            <button onClick={() => setStep(0)} className="px-5 py-3 rounded-lg border text-gray-700 hover:bg-gray-50">이전</button>
-            <button onClick={() => setStep(3)} className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">다음</button>
-            </div>
+          {/* 오른쪽: 선택된 장소 영역 (슬라이드 가능) */}
+          <div className={`transition-all duration-300 ease-in-out ${selectedPanelOpen ? 'w-[350px]' : 'w-0'} bg-white shadow-2xl overflow-hidden flex flex-col h-full border-l border-gray-200`}>
+            {selectedPanelOpen && (
+              <>
+                {/* 헤더 */}
+                <div className="p-4 pb-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                  <div className="flex items-baseline gap-2">
+                    <div className="text-2xl font-bold text-gray-800">
+                      {selectedPlaces.length}
+                    </div>
+                    {selectedPlaces.length > 0 && (
+                      <div className="text-xs text-gray-600">
+                        {totalTime.hours}시간 {totalTime.minutes}분 / {Math.floor(calculateTotalTravelTime()/60)}시간 {calculateTotalTravelTime()%60}분
+                      </div>
+                    )}
+                  </div>
+                  {selectedPlaces.length > 0 && (
+                    <button 
+                      onClick={() => setSelectedPlaces([])}
+                      className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      전체 삭제
+                    </button>
+                  )}
+                </div>
+
+                {/* 선택된 장소 리스트 */}
+                <div className="flex-1 overflow-y-auto px-3 py-2">
+                  {selectedPlaces.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-400 py-8">
+                      <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <p className="text-sm text-center">
+                        왼쪽에서 장소를 선택하면<br/>
+                        여기에 표시됩니다
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedPlaces.map((place, index) => (
+                        <div key={place.id} className="p-2.5 bg-white border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                          <div className="flex items-start gap-2 mb-2">
+                            <div className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-semibold">
+                              {index + 1}
+                            </div>
+                            
+                            {/* 썸네일 추가 */}
+                            <img 
+                              src={place.image} 
+                              alt={place.name}
+                              className="w-14 h-14 object-cover rounded bg-gray-200 flex-shrink-0"
+                              onError={(e) => {
+                                if (!e.target.src.startsWith('data:')) {
+                                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                                }
+                              }}
+                            />
+                            
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium text-sm text-gray-800 mb-0.5" style={{ 
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                                wordBreak: 'break-word',
+                                lineHeight: '1.2rem',
+                                maxHeight: '2.4rem'
+                              }}>{place.name}</div>
+                              <div className="text-xs text-gray-500 mb-1">
+                                <span className="text-blue-600">{place.category}</span>
+                              </div>
+                              {place.address && (
+                                <div className="text-xs text-gray-400 truncate">{place.address}</div>
+                              )}
+                            </div>
+                            
+                            <button
+                              onClick={() => removeSelectedPlace(place.id)}
+                              className="flex-shrink-0 w-5 h-5 rounded-full text-gray-400 hover:text-red-500 hover:bg-red-100 transition-colors flex items-center justify-center"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          
+                          {/* 체류 시간 설정 */}
+                          <div className="flex items-center gap-1.5 pl-8 text-xs">
+                            <span className="text-gray-500">시간:</span>
+                            <select
+                              value={place.stayHours || 2}
+                              onChange={(e) => {
+                                const hours = parseInt(e.target.value);
+                                updatePlaceStayTime(place.id, hours, place.stayMinutes || 0);
+                              }}
+                              className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            >
+                              {[...Array(13)].map((_, i) => (
+                                <option key={i} value={i}>{i}</option>
+                              ))}
+                            </select>
+                            <span className="text-gray-500">시간</span>
+                            <select
+                              value={place.stayMinutes || 0}
+                              onChange={(e) => {
+                                const minutes = parseInt(e.target.value);
+                                updatePlaceStayTime(place.id, place.stayHours || 2, minutes);
+                              }}
+                              className="px-1.5 py-1 text-xs border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 bg-white"
+                            >
+                              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map((m) => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </select>
+                            <span className="text-gray-500">분</span>
+                </div>
+              </div>
+            ))}
+          </div>
+                  )}
+                </div>
+              </>
+            )}
         </div>
+
+          {/* 토글 버튼 (항상 표시) */}
+          {(
+            <button
+              onClick={() => setSelectedPanelOpen(!selectedPanelOpen)}
+              className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-gray-300 rounded-r-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+            >
+              <svg 
+                className={`w-4 h-4 text-gray-600 transition-transform ${selectedPanelOpen ? '' : 'rotate-180'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+        </div>
+
 
       {/* 장소 등록 모달 */}
       {placeRegistrationModal && (
@@ -969,7 +1078,7 @@ const TripPlanPageEx1 = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-        </div>
+      </div>
 
             {/* 모달 본문 */}
             <div className="p-6">
@@ -1064,8 +1173,743 @@ const TripPlanPageEx1 = () => {
           </div>
         </div>
       )}
+                      </div>
+  );
+  };
+
+  // 숙소 선택 모드 (step 3)
+  const AccommodationMode = () => {
+    const [accommodationQuery, setAccommodationQuery] = useState('');
+    const [accommodationSearchQuery, setAccommodationSearchQuery] = useState('');
+    const [isComposing, setIsComposing] = useState(false);
+    const [accommodations, setAccommodations] = useState([]);
+    const [accommodationsLoading, setAccommodationsLoading] = useState(false);
+    const [selectedAccommodations, setSelectedAccommodations] = useState([]); // {dayIndex, accommodation}
+    const [accommodationModal, setAccommodationModal] = useState(false);
+    const [accommodationDetailModal, setAccommodationDetailModal] = useState(null); // 숙소 상세 모달
+    const [selectedPanelOpen, setSelectedPanelOpen] = useState(true);
+
+    // 숙소 데이터 가져오기
+    const fetchAccommodations = async () => {
+      if (!selectedDestination.lat || !selectedDestination.lng) return;
+      
+      setAccommodationsLoading(true);
+      try {
+        const res = await fetch('/api/places/nearby', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            latitude: selectedDestination.lat,
+            longitude: selectedDestination.lng,
+            radius: 50000,
+            categories: ['lodging', 'hotel', 'hostel', 'resort_hotel', 'guest_house']
+          })
+        });
+        
+        if (!res.ok) {
+          console.warn(`숙소 검색 실패: HTTP ${res.status}`);
+          setAccommodations([]);
+          return;
+        }
+        
+        const data = await res.json();
+        const places = data.places || [];
+        
+        const transformed = places.map((place, index) => {
+          const displayName = place.displayName?.text || place.displayName || '이름 없음';
+          const address = place.formattedAddress || '주소 정보 없음';
+          const lat = place.location?.latitude;
+          const lng = place.location?.longitude;
+          const rating = place.rating || 0;
+          const userRatingCount = place.userRatingCount || 0;
+          const photos = place.photos || [];
+          const firstPhoto = photos.length > 0 ? photos[0].name : null;
+          const editorialSummary = place.editorialSummary?.text || place.editorialSummary || '';
+          
+          let image = null;
+          if (firstPhoto) {
+            image = `/api/places/photo?name=${encodeURIComponent(firstPhoto)}&maxWidth=200`;
+          }
+          
+          return {
+            id: place.id || `accommodation-${index}`,
+            name: displayName,
+            category: '숙소',
+            address,
+            image,
+            likes: userRatingCount,
+            rating: rating,
+            lat,
+            lng,
+            description: editorialSummary,
+          };
+        });
+        
+        setAccommodations(transformed);
+      } catch (err) {
+        console.error('숙소 fetch error:', err);
+        setAccommodations([]);
+      } finally {
+        setAccommodationsLoading(false);
+      }
+    };
+
+    useEffect(() => {
+      if (selectedDestination.lat && selectedDestination.lng && accommodations.length === 0) {
+        fetchAccommodations();
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // 검색 필터링
+    const filteredAccommodations = useMemo(() => {
+      if (!accommodationSearchQuery.trim()) return accommodations;
+      const query = accommodationSearchQuery.toLowerCase();
+      return accommodations.filter(a => 
+        a.name.toLowerCase().includes(query) || 
+        a.address.toLowerCase().includes(query)
+      );
+    }, [accommodationSearchQuery, accommodations]);
+
+    // 총 여행 일수 계산
+    const getTotalDays = () => {
+      if (!startDate || !endDate) return 0;
+      const diffTime = Math.abs(endDate - startDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return diffDays;
+    };
+
+    // 날짜 선택 모달 관련 state
+    const [daySelectionModal, setDaySelectionModal] = useState(null); // { accommodation: {...}, selectedDays: [0, 1, ...] }
+    
+    // 날짜 선택 모달 열기
+    const openDaySelectionModal = (accommodation) => {
+      // 이미 선택된 날짜들 찾기
+      const alreadySelectedDays = selectedAccommodations
+        .filter(acc => acc.accommodation.id === accommodation.id)
+        .map(acc => acc.dayIndex);
+      
+      setDaySelectionModal({
+        accommodation,
+        selectedDays: alreadySelectedDays
+      });
+    };
+    
+    // 날짜 선택 모달에서 날짜 토글
+    const toggleDayInModal = (dayIndex) => {
+      setDaySelectionModal(prev => {
+        const isSelected = prev.selectedDays.includes(dayIndex);
+        return {
+          ...prev,
+          selectedDays: isSelected 
+            ? prev.selectedDays.filter(d => d !== dayIndex)
+            : [...prev.selectedDays, dayIndex]
+        };
+      });
+    };
+    
+    // 날짜 선택 완료
+    const confirmDaySelection = () => {
+      if (!daySelectionModal) return;
+      
+      const { accommodation, selectedDays } = daySelectionModal;
+      
+      // 기존에 이 숙소로 선택된 모든 날짜 제거
+      setSelectedAccommodations(prev => 
+        prev.filter(acc => acc.accommodation.id !== accommodation.id)
+      );
+      
+      // 새로 선택된 날짜들에 대해 추가
+      const newSelections = selectedDays.map(dayIndex => ({
+        dayIndex,
+        accommodation
+      }));
+      
+      setSelectedAccommodations(prev => [...prev, ...newSelections]);
+      
+      // 모달 닫기
+      setDaySelectionModal(null);
+    };
+
+    return (
+      <div className="relative w-full h-screen">
+        {/* 배경 지도 */}
+        <div className="absolute inset-0">
+          <DirectSearchMap
+            centerLat={selectedDestination.lat}
+            centerLng={selectedDestination.lng}
+            selectedPlaces={selectedAccommodations}
+          />
+                      </div>
+
+        {/* 왼쪽 단계 표시 영역 */}
+        <div className="absolute left-0 top-0 bottom-0 w-[110px] bg-white shadow-lg flex flex-col z-10 border-r border-gray-200">
+          <div className="flex-1 pt-8 pb-4">
+            <div className="space-y-1">
+              {/* STEP 1: 도시 선택 */}
+              <div className="px-3 py-4">
+                <div className="text-xs text-gray-500 mb-1">STEP 1</div>
+                <div className="text-sm font-semibold text-gray-700">
+                  도시 선택
+                    </div>
+              </div>
+
+              {/* STEP 2: 장소 선택 */}
+              <div className="px-3 py-4">
+                <div className="text-xs text-gray-500 mb-1">STEP 2</div>
+                <div className="text-sm font-semibold text-gray-700">
+                  장소 선택
+                </div>
+              </div>
+
+              {/* STEP 3: 숙소 선택 */}
+              <div className="px-3 py-4 bg-cyan-50 border-l-4 border-cyan-400">
+                <div className="text-xs text-gray-500 mb-1">STEP 3</div>
+                <div className="text-sm font-semibold text-cyan-600">
+                  숙소 선택
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 하단 버튼 */}
+          <div className="p-3 space-y-2 border-t border-gray-200">
+            <button 
+              onClick={() => setStep(2)} 
+              className="w-full px-3 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 text-xs font-medium transition-colors"
+            >
+              이전
+            </button>
+            <button 
+              onClick={() => alert('일정 저장 기능 구현 예정')} 
+              className="w-full px-3 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-semibold transition-colors"
+            >
+              완료
+            </button>
+          </div>
+        </div>
+
+        {/* Unified Panel: 숙소 선택 + 선택된 숙소 */}
+        <div className="absolute left-[110px] top-0 bottom-0 flex gap-0 z-10">
+          {/* 왼쪽: 숙소 선택 영역 */}
+          <div className="w-[400px] bg-white shadow-2xl text-left flex flex-col h-full">
+            {/* 헤더 */}
+            <div className="p-4 pb-3 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-2xl font-bold text-gray-800 mb-1">
+                {selectedDestination.name || '여행지'}
+              </h2>
+              <div className="text-base text-gray-600">
+                {startDate && endDate ? (
+                  <>
+                    {formatDateWithWeekday(startDate)} ~ {formatDateWithWeekday(endDate)}
+                  </>
+                ) : (
+                  dateRange || '날짜 선택'
+                )}
+              </div>
+            </div>
+            
+            {/* 검색창 */}
+            <div className="p-3 pb-2 border-b border-gray-200 flex-shrink-0">
+              <div className="mb-2">
+                <div className="relative">
+                    <input
+                    type="text"
+                    value={accommodationQuery}
+                    onChange={(e) => setAccommodationQuery(e.target.value)}
+                    onCompositionStart={() => setIsComposing(true)}
+                    onCompositionEnd={() => setIsComposing(false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !isComposing) {
+                        setAccommodationSearchQuery(accommodationQuery);
+                      }
+                    }}
+                    placeholder="숙소명 검색"
+                    className="w-full px-3 py-2.5 pl-10 text-sm border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <svg className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+            </div>
+                <div className="mt-1">
+                  <button 
+                    onClick={() => setAccommodationModal(true)}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    찾으시는 숙소가 없나요?
+                  </button>
+                </div>
+              </div>
+        </div>
+
+          {/* 숙소 목록 */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
+            <div className="space-y-1.5">
+              {accommodationsLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-2"></div>
+                  <span className="text-sm">숙소 로딩 중...</span>
+        </div>
+              ) : filteredAccommodations.length === 0 ? (
+                <div className="text-center text-gray-400 py-8">
+                  <div className="text-base mb-1">😔</div>
+                  <div className="text-sm">검색 결과가 없습니다.</div>
+      </div>
+              ) : (
+                filteredAccommodations.map((acc) => {
+                  return (
+                    <div 
+                      key={acc.id} 
+                      onClick={() => setAccommodationDetailModal(acc)}
+                      className="flex gap-2.5 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors bg-white cursor-pointer"
+                    >
+                      <img 
+                        src={acc.image} 
+                        alt={acc.name}
+                        className="w-16 h-16 object-cover rounded bg-gray-200 flex-shrink-0"
+                        onError={(e) => {
+                          if (!e.target.src.startsWith('data:')) {
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                          }
+                        }}
+                      />
+                      
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <div>
+                          <div className="font-semibold text-sm text-gray-800 mb-1" style={{ 
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'break-word',
+                            lineHeight: '1.2rem',
+                            maxHeight: '2.4rem'
+                          }}>{acc.name}</div>
+                          <div className="text-xs text-gray-500 truncate">
+                            {acc.address}
+      </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="flex items-center gap-0.5">
+                            <svg className="w-3.5 h-3.5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                            <span>{acc.rating}</span>
+                          </div>
+                          <div className="flex items-center gap-0.5">
+                            <svg className="w-3.5 h-3.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                            </svg>
+                            <span>{acc.likes}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDaySelectionModal(acc);
+                        }}
+                        className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
     </div>
   );
+                })
+              )}
+            </div>
+          </div>
+          </div>
+
+          {/* 오른쪽: 선택된 숙소 영역 (슬라이드 가능) */}
+          <div className={`transition-all duration-300 ease-in-out ${selectedPanelOpen ? 'w-[350px]' : 'w-0'} bg-white shadow-2xl overflow-hidden flex flex-col h-full border-l border-gray-200`}>
+            {selectedPanelOpen && (
+              <>
+                {/* 헤더 */}
+                <div className="p-4 pb-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                  <div className="flex items-baseline gap-2">
+                    <div className="text-2xl font-bold text-gray-800">
+                      {selectedAccommodations.length}
+                    </div>
+                    {getTotalDays() > 0 && (
+                      <div className="text-xs text-gray-600">
+                        {selectedAccommodations.length}일 / {getTotalDays()}일
+                      </div>
+                    )}
+                  </div>
+                  {selectedAccommodations.length > 0 && (
+                    <button 
+                      onClick={() => setSelectedAccommodations([])}
+                      className="text-xs text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      전체 삭제
+                    </button>
+                  )}
+                </div>
+
+                {/* 선택된 숙소 리스트 - 일자별 슬롯 */}
+                <div className="flex-1 overflow-y-auto px-3 py-2">
+                  <div className="space-y-3">
+                    {Array.from({ length: getTotalDays() }, (_, index) => {
+                      const dayNumber = index + 1;
+                      const dayAccommodation = selectedAccommodations.find(acc => acc.dayIndex === index);
+                      
+                      return (
+                        <div key={index} className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                          {/* 좌측: 숫자 */}
+                          <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-sm font-semibold flex-shrink-0">
+                            {dayNumber}
+                          </div>
+
+                          {/* 중앙: 사진 영역 (숙소가 있을 때만) */}
+                          {dayAccommodation && (
+                            <div className="w-16 h-16 flex-shrink-0 relative">
+                              <img 
+                                src={dayAccommodation.accommodation.image} 
+                                alt={dayAccommodation.accommodation.name}
+                                className="w-full h-full object-cover rounded-lg"
+                                onError={(e) => {
+                                  if (!e.target.src.startsWith('data:')) {
+                                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+
+                          {/* 우측: 날짜와 텍스트 정보 */}
+                          <div className="flex-1 min-w-0">
+                            {dayAccommodation ? (
+                              <>
+                                {/* 날짜 (파란색) */}
+                                <div className="text-blue-600 text-xs font-medium mb-1">
+                                  {(() => {
+                                    const date = new Date(startDate);
+                                    date.setDate(date.getDate() + index);
+                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                    const day = String(date.getDate()).padStart(2, '0');
+                                    const days = ['일', '월', '화', '수', '목', '금', '토'];
+                                    const dayOfWeek = days[date.getDay()];
+                                    return `${month}/${day}(${dayOfWeek}) ~ ${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate() + 1).padStart(2, '0')}(${days[(date.getDay() + 1) % 7]})`;
+                                  })()}
+                                </div>
+                                {/* 숙소 이름 */}
+                                <div className="font-semibold text-sm text-gray-800 mb-1 line-clamp-1">
+                                  {dayAccommodation.accommodation.name}
+                                </div>
+                                {/* 버튼들: 삭제 */}
+                                <button
+                                  onClick={() => {
+                                    setSelectedAccommodations(prev => prev.filter(acc => acc.dayIndex !== index));
+                                  }}
+                                  className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                                >
+                                  삭제
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                {/* 날짜 (파란색) */}
+                                <div className="text-blue-600 text-xs font-medium mb-1">
+                                  {(() => {
+                                    const date = new Date(startDate);
+                                    date.setDate(date.getDate() + index);
+                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                    const day = String(date.getDate()).padStart(2, '0');
+                                    const days = ['일', '월', '화', '수', '목', '금', '토'];
+                                    const dayOfWeek = days[date.getDay()];
+                                    return `${month}/${day}(${dayOfWeek}) ~ ${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate() + 1).padStart(2, '0')}(${days[(date.getDay() + 1) % 7]})`;
+                                  })()}
+                                </div>
+                                {/* 안내 텍스트 */}
+                                <div className="text-xs text-gray-400">
+                                  숙소를 추가하여 주세요.
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {getTotalDays() === 0 && (
+                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <svg className="w-16 h-16 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        <p className="text-sm text-center">
+                          날짜를 먼저 선택해주세요
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 토글 버튼 (항상 표시) */}
+          {(
+            <button
+              onClick={() => setSelectedPanelOpen(!selectedPanelOpen)}
+              className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-12 bg-white border border-gray-300 rounded-r-lg shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+            >
+              <svg 
+                className={`w-4 h-4 text-gray-600 transition-transform ${selectedPanelOpen ? '' : 'rotate-180'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {/* 숙소 직접 추가 모달 */}
+        {accommodationModal && (
+          <AccommodationSearchModal 
+            onClose={() => {
+              setAccommodationModal(false);
+            }}
+            onAddAccommodation={(acc) => {
+              // 날짜 선택 모달 열기
+              setAccommodationModal(false);
+              openDaySelectionModal(acc);
+            }}
+            selectedDestination={selectedDestination}
+          />
+        )}
+
+        {/* 숙소 상세 정보 모달 */}
+        {accommodationDetailModal && (
+          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" onClick={() => setAccommodationDetailModal(null)}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+              {/* 모달 헤더 */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <h3 className="text-xl font-semibold text-gray-800">숙소 정보</h3>
+                <button 
+                  onClick={() => setAccommodationDetailModal(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* 모달 본문 */}
+              <div className="p-6">
+                {/* 이미지 */}
+                {accommodationDetailModal.image && (
+                  <div className="mb-4">
+                    <img 
+                      src={accommodationDetailModal.image.replace('maxWidth=200', 'maxWidth=600')} 
+                      alt={accommodationDetailModal.name}
+                      className="w-full h-64 object-cover rounded-lg"
+                      onError={(e) => {
+                        if (!e.target.src.startsWith('data:')) {
+                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNjAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjIwIiBmaWxsPSIjOWM5OWMzIiBkeT0iLjNlbSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* 기본 정보 */}
+                <div className="mb-4">
+                  <h4 className="text-2xl font-bold text-gray-800 mb-2">{accommodationDetailModal.name}</h4>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-600 rounded-full text-sm font-medium">
+                      숙소
+                    </span>
+                  </div>
+                  <p className="text-gray-600 text-sm flex items-start gap-2">
+                    <svg className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>{accommodationDetailModal.address}</span>
+                  </p>
+                </div>
+
+                {/* 평점 정보 */}
+                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                    <span className="text-lg font-semibold text-gray-800">{accommodationDetailModal.rating}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-600">{accommodationDetailModal.likes} 리뷰</span>
+                  </div>
+                </div>
+
+                {/* 설명 */}
+                {accommodationDetailModal.description ? (
+                  <div className="mb-6">
+                    <h5 className="text-lg font-semibold text-gray-800 mb-2">숙소 소개</h5>
+                    <p className="text-gray-600 leading-relaxed">{accommodationDetailModal.description}</p>
+                  </div>
+                ) : (
+                  <div className="mb-6">
+                    <p className="text-gray-400 text-sm italic">이 숙소에 대한 설명이 제공되지 않았습니다.</p>
+                  </div>
+                )}
+
+                {/* 액션 버튼 - 날짜 선택 */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setAccommodationDetailModal(null);
+                      openDaySelectionModal(accommodationDetailModal);
+                    }}
+                    className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+                  >
+                    날짜 선택하기
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 날짜 선택 모달 */}
+        {daySelectionModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl w-[450px] max-h-[80vh] flex flex-col">
+              {/* 헤더 */}
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-800">숙박할 날짜를 선택하세요</h3>
+                  <button
+                    onClick={() => setDaySelectionModal(null)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                {/* 선택된 숙소 정보 */}
+                <div className="mt-3 flex gap-3 items-center">
+                  <img 
+                    src={daySelectionModal.accommodation.image} 
+                    alt={daySelectionModal.accommodation.name}
+                    className="w-16 h-16 object-cover rounded-lg bg-gray-200"
+                    onError={(e) => {
+                      if (!e.target.src.startsWith('data:')) {
+                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                      }
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-gray-800 truncate">
+                      {daySelectionModal.accommodation.name}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {daySelectionModal.accommodation.address}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 날짜 목록 */}
+              <div className="flex-1 overflow-y-auto px-6 py-4">
+                <div className="space-y-2">
+                  {Array.from({ length: getTotalDays() }, (_, index) => {
+                    const dayNumber = index + 1;
+                    const isSelected = daySelectionModal.selectedDays.includes(index);
+                    const date = new Date(startDate);
+                    date.setDate(date.getDate() + index);
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const days = ['일', '월', '화', '수', '목', '금', '토'];
+                    const dayOfWeek = days[date.getDay()];
+                    
+                    // 다른 숙소가 이미 이 날짜에 선택되어 있는지 확인
+                    const otherAccommodation = selectedAccommodations.find(
+                      acc => acc.dayIndex === index && acc.accommodation.id !== daySelectionModal.accommodation.id
+                    );
+                    
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => toggleDayInModal(index)}
+                        disabled={!!otherAccommodation}
+                        className={`w-full flex items-center justify-between p-4 rounded-lg border-2 transition-colors ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50'
+                            : otherAccommodation
+                            ? 'border-gray-200 bg-gray-50 cursor-not-allowed'
+                            : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold ${
+                            isSelected ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600'
+                          }`}>
+                            {dayNumber}
+                          </div>
+                          <div className="text-left">
+                            <div className="text-sm font-medium text-gray-800">
+                              {dayNumber}일차
+                            </div>
+                            <div className="text-xs text-blue-600">
+                              {month}/{day}({dayOfWeek}) ~ {String(date.getMonth() + 1).padStart(2, '0')}/{String(date.getDate() + 1).padStart(2, '0')}({days[(date.getDay() + 1) % 7]})
+                            </div>
+                            {otherAccommodation && (
+                              <div className="text-xs text-gray-400 truncate max-w-[200px]">
+                                {otherAccommodation.accommodation.name}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 푸터 - 완료 버튼 */}
+              <div className="px-6 py-4 border-t border-gray-200">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDaySelectionModal(null)}
+                    className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={confirmDaySelection}
+                    disabled={daySelectionModal.selectedDays.length === 0}
+                    className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-colors ${
+                      daySelectionModal.selectedDays.length === 0
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    완료 ({daySelectionModal.selectedDays.length}일)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // AI 모드 본문(목업)
@@ -1158,17 +2002,53 @@ const TripPlanPageEx1 = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="px-4 py-12 max-w-none">
+    <div className="h-screen bg-gray-50 overflow-hidden">
+      <div className="h-full">
         <HeaderView step={step} />
 
         {step === 0 && (
-          <div className="flex flex-col min-[500px]:flex-row gap-6 w-full">
-            <div className="min-[500px]:w-[600px] w-full">
-          <CommonFormView state={state} handlers={handlers} />
+          <div className="relative w-full h-screen">
+            {/* 왼쪽 단계 표시 영역 */}
+            <div className="absolute left-0 top-0 bottom-0 w-[110px] bg-white shadow-lg flex flex-col z-10 border-r border-gray-200">
+              <div className="flex-1 pt-8 pb-4">
+                <div className="space-y-1">
+                  {/* STEP 1: 도시 선택 */}
+                  <div className="px-3 py-4 bg-cyan-50 border-l-4 border-cyan-400">
+                    <div className="text-xs text-gray-500 mb-1">STEP 1</div>
+                    <div className="text-sm font-semibold text-cyan-600">
+                      도시 선택
+                    </div>
+                  </div>
+
+                  {/* STEP 2: 장소 선택 */}
+                  <div className="px-3 py-4">
+                    <div className="text-xs text-gray-500 mb-1">STEP 2</div>
+                    <div className="text-sm font-semibold text-gray-700">
+                      장소 선택
+                    </div>
+                  </div>
+
+                  {/* STEP 3: 숙소 선택 */}
+                  <div className="px-3 py-4">
+                    <div className="text-xs text-gray-500 mb-1">STEP 3</div>
+                    <div className="text-sm font-semibold text-gray-700">
+                      숙소 선택
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <MapPreview selectedDestination={selectedDestination} />
+
+            {/* 기존 콘텐츠를 오른쪽으로 이동 */}
+            <div className="absolute left-[110px] top-0 right-0 bottom-0 overflow-auto">
+              <div className="flex flex-col min-[500px]:flex-row gap-6 w-full px-4 py-6">
+                <div className="min-[500px]:w-[600px] w-full">
+          <CommonFormView state={state} handlers={handlers} />
+                </div>
+                <div className="flex-1">
+                  <MapPreview selectedDestination={selectedDestination} />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -1176,7 +2056,7 @@ const TripPlanPageEx1 = () => {
           <ModeSelect />
         )}
         {step === 2 && (mode === 'direct' ? <DirectMode /> : <AiMode />)}
-        {step === 3 && <Finalize />}
+        {step === 3 && <AccommodationMode />}
       </div>
 
       {hasUnsavedChanges && (
@@ -1749,7 +2629,7 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces }) {
       }
     }
 
-    // 선택된 장소들이 모두 보이도록 지도 범위 조정
+    // 선택된 장소들이 모두 보이도록 지도 범위 조정 (왼쪽 패널 고려)
     if (selectedPlacesList.length > 0) {
       const bounds = new maps.LatLngBounds();
       let validCoords = 0;
@@ -1764,12 +2644,40 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces }) {
       console.log(`Valid coordinates for bounds: ${validCoords}`);
       
       if (validCoords > 0) {
-        // 장소가 1개일 경우 줌 레벨 유지, 2개 이상일 경우 범위에 맞춤
+        // 장소가 1개일 경우
         if (validCoords === 1) {
-          mapRefInstance.current.setCenter(bounds.getCenter());
-          mapRefInstance.current.setZoom(14);
+          const center = bounds.getCenter();
+          
+          // 픽셀 단위로 중심점을 오른쪽으로 이동
+          const projection = mapRefInstance.current.getProjection();
+          const zoom = 14;
+          mapRefInstance.current.setZoom(zoom);
+          
+          // 왼쪽 패널 너비만큼 오른쪽으로 오프셋 (약 510px = 단계패널 110px + 장소패널 400px)
+          // 지도 전체 너비의 약 1/4 정도 왼쪽으로 치우치게
+          if (projection) {
+            const scale = Math.pow(2, zoom);
+            const worldCoordinate = projection.fromLatLngToPoint(center);
+            const pixelOffset = 250 / (256 * scale); // 왼쪽으로 250픽셀 정도 오프셋
+            
+            const newCenter = projection.fromPointToLatLng(
+              new maps.Point(
+                worldCoordinate.x + pixelOffset,
+                worldCoordinate.y
+              )
+            );
+            mapRefInstance.current.setCenter(newCenter);
+          } else {
+            mapRefInstance.current.setCenter(center);
+          }
         } else {
-          mapRefInstance.current.fitBounds(bounds, 50); // 50px 패딩
+          // 2개 이상일 경우 범위 조정 후 중심 이동
+          mapRefInstance.current.fitBounds(bounds, {
+            top: 50,
+            right: 50,
+            bottom: 50,
+            left: 560 // 왼쪽에 더 큰 패딩 (단계패널 110px + 장소패널 400px + 여유 50px)
+          });
         }
       }
     }
@@ -1784,9 +2692,8 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces }) {
   }, [centerLat, centerLng]);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h3 className="text-lg font-semibold text-gray-800 mb-3">검색 지도</h3>
-      <div ref={mapRef} className="w-full h-[500px] border rounded" />
+    <div className="w-full h-full">
+      <div ref={mapRef} className="w-full h-full" />
     </div>
   );
 }
@@ -1995,6 +2902,200 @@ function PlaceRegistrationModal({ onClose, onAddPlace, selectedDestination }) {
                     {/* 추가 버튼 */}
                     <button
                       onClick={() => handleAddPlace(place)}
+                      className="flex-shrink-0 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
+                    >
+                      추가
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 숙소 검색 모달 컴포넌트
+function AccommodationSearchModal({ onClose, onAddAccommodation, selectedDestination }) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      alert('숙소명을 입력해주세요.');
+      return;
+    }
+    
+    if (!selectedDestination.lat || !selectedDestination.lng) {
+      alert('여행지 정보가 없습니다.');
+      return;
+    }
+    
+    setSearchLoading(true);
+    try {
+      const res = await fetch('/api/places/textsearch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: searchQuery + ' 호텔 숙소',
+          latitude: selectedDestination.lat,
+          longitude: selectedDestination.lng
+        })
+      });
+      
+      if (!res.ok) {
+        console.warn(`숙소 검색 실패: HTTP ${res.status}`);
+        alert('숙소 검색에 실패했습니다.');
+        setSearchResults([]);
+        return;
+      }
+      
+      const data = await res.json();
+      const places = data.places || [];
+      
+      const transformed = places.map((place, index) => {
+        const displayName = place.displayName?.text || place.displayName || '이름 없음';
+        const address = place.formattedAddress || '주소 정보 없음';
+        const lat = place.location?.latitude;
+        const lng = place.location?.longitude;
+        const rating = place.rating || 0;
+        const userRatingCount = place.userRatingCount || 0;
+        const photos = place.photos || [];
+        const firstPhoto = photos.length > 0 ? photos[0].name : null;
+        const editorialSummary = place.editorialSummary?.text || place.editorialSummary || '';
+        
+        let image = null;
+        if (firstPhoto) {
+          image = `/api/places/photo?name=${encodeURIComponent(firstPhoto)}&maxWidth=200`;
+        }
+        
+        return {
+          id: place.id || `search-accommodation-${index}`,
+          name: displayName,
+          category: '숙소',
+          address,
+          image,
+          likes: userRatingCount,
+          rating: rating,
+          lat,
+          lng,
+          description: editorialSummary,
+        };
+      });
+      
+      setSearchResults(transformed);
+    } catch (err) {
+      console.error('숙소 검색 오류:', err);
+      alert('숙소 검색 중 오류가 발생했습니다.');
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const handleAdd = (accommodation) => {
+    onAddAccommodation(accommodation);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-gray-800">숙소 등록</h3>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="p-6">
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">숙소명을 입력하세요</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                placeholder="예: 힐튼 호텔, 파크 하얏트, 게스트하우스"
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+              />
+              <button
+                onClick={handleSearch}
+                disabled={searchLoading}
+                className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold disabled:bg-gray-400"
+              >
+                {searchLoading ? '검색 중...' : '검색'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            {searchLoading ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                <span>숙소를 검색하는 중...</span>
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center text-gray-400 py-12">
+                <div className="text-lg mb-2">🔍</div>
+                <div>숙소를 검색해보세요</div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-gray-700 mb-3">
+                  검색 결과 {searchResults.length}개
+                </div>
+                {searchResults.map((acc) => (
+                  <div 
+                    key={acc.id} 
+                    className="flex gap-3 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                  >
+                    <img 
+                      src={acc.image} 
+                      alt={acc.name}
+                      className="w-16 h-16 object-cover rounded bg-gray-200 flex-shrink-0"
+                      onError={(e) => {
+                        if (!e.target.src.startsWith('data:')) {
+                          e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                        }
+                      }}
+                    />
+                    
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-800 mb-1 truncate">{acc.name}</div>
+                      <div className="text-xs text-gray-500 mb-1 truncate">{acc.address}</div>
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
+                        <div className="flex items-center gap-1">
+                          <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                          <span>{acc.rating}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                          </svg>
+                          <span>{acc.likes}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleAdd(acc)}
                       className="flex-shrink-0 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors"
                     >
                       추가

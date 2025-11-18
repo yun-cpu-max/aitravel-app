@@ -119,6 +119,13 @@ const PopularDestinations = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [destinationDetails, setDestinationDetails] = useState(null);
   const imgRetryRef = React.useRef(new Map());
+  
+  // 검색 관련 state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
 
   const handleImageError = (dest, ev) => {
     const key = dest.id;
@@ -322,6 +329,131 @@ const PopularDestinations = () => {
     };
   }, []);
 
+  // 도시 이름을 한국어로 매핑
+  const getCityNameInKorean = (englishName) => {
+    const cityNameMap = {
+      'Dubai': '두바이',
+      'Amsterdam': '암스테르담',
+      'Tokyo': '도쿄',
+      'Paris': '파리',
+      'London': '런던',
+      'New York': '뉴욕',
+      'Seoul': '서울',
+      'Bangkok': '방콕',
+      'Singapore': '싱가포르',
+      'Hong Kong': '홍콩',
+      'Rome': '로마',
+      'Barcelona': '바르셀로나',
+      'Istanbul': '이스탄불',
+      'Prague': '프라하',
+      'Vienna': '빈',
+      'Berlin': '베를린',
+      'Sydney': '시드니',
+      'Melbourne': '멜버른',
+      'Los Angeles': '로스앤젤레스',
+      'San Francisco': '샌프란시스코',
+      'Toronto': '토론토',
+      'Vancouver': '밴쿠버',
+      'Shanghai': '상하이',
+      'Beijing': '베이징',
+      'Osaka': '오사카',
+      'Kyoto': '교토',
+      'Taipei': '타이베이',
+      'Kuala Lumpur': '쿠알라룸푸르',
+      'Bali': '발리',
+      'Phuket': '푸켓',
+      'Hanoi': '하노이',
+      'Ho Chi Minh City': '호치민',
+      'Manila': '마닐라',
+      'Lisbon': '리스본',
+      'Athens': '아테네',
+      'Copenhagen': '코펜하겐',
+      'Stockholm': '스톡홀름',
+      'Zurich': '취리히',
+      'Munich': '뮌헨',
+      'Milan': '밀라노',
+      'Venice': '베네치아',
+      'Florence': '피렌체',
+      'Madrid': '마드리드',
+      'Seville': '세비야',
+      'Edinburgh': '에든버러',
+      'Dublin': '더블린',
+      'Budapest': '부다페스트',
+      'Warsaw': '바르샤바',
+      'Krakow': '크라쿠프',
+      'Cairo': '카이로',
+      'Cape Town': '케이프타운',
+      'Marrakech': '마라케시',
+      'Reykjavik': '레이캬비크',
+      'Helsinki': '헬싱키',
+      'Oslo': '오슬로',
+    };
+    
+    return cityNameMap[englishName] || englishName;
+  };
+
+  // 위키백과에서 한국어 설명 가져오기
+  const fetchWikipediaDescription = async (cityName) => {
+    try {
+      // cityName이 유효한지 확인
+      if (!cityName || cityName === 'undefined' || cityName === 'Unknown City' || cityName.length < 2) {
+        console.warn('Invalid city name for Wikipedia:', cityName);
+        return '';
+      }
+      
+      // 한국어 도시명으로 변환
+      const koreanName = getCityNameInKorean(cityName);
+      
+      console.log(`Fetching Wikipedia for: ${cityName} (${koreanName})`);
+      
+      // 한국어 이름으로 한국어 위키백과 시도
+      const koResponse = await fetch(
+        `https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(koreanName)}`,
+        { signal: AbortSignal.timeout(3000) } // 3초 타임아웃
+      );
+      
+      if (koResponse.ok) {
+        const koData = await koResponse.json();
+        console.log('Korean Wikipedia response:', koData);
+        
+        // 도시 관련 페이지인지 확인 (disambiguation 페이지나 이상한 페이지 제외)
+        if (koData.extract && 
+            koData.extract.length > 50 && 
+            !koData.extract.includes('동음이의') &&
+            !koData.extract.includes('컴퓨팅') &&
+            !koData.extract.includes('프로그래밍') &&
+            koData.type !== 'disambiguation') {
+          return koData.extract;
+        }
+      }
+      
+      // 영문 이름으로도 한국어 위키백과 시도
+      if (koreanName !== cityName) {
+        const koResponse2 = await fetch(
+          `https://ko.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cityName)}`,
+          { signal: AbortSignal.timeout(3000) }
+        );
+        
+        if (koResponse2.ok) {
+          const koData2 = await koResponse2.json();
+          if (koData2.extract && 
+              koData2.extract.length > 50 && 
+              !koData2.extract.includes('동음이의') &&
+              !koData2.extract.includes('컴퓨팅') &&
+              !koData2.extract.includes('프로그래밍') &&
+              koData2.type !== 'disambiguation') {
+            return koData2.extract;
+          }
+        }
+      }
+      
+      return '';
+    } catch (error) {
+      console.warn('Wikipedia fetch failed:', error);
+      return '';
+    }
+  };
+
   // 카드 클릭 시 상세 정보 가져오기
   const handleCardClick = async (destination) => {
     setSelectedDestination(destination);
@@ -337,11 +469,32 @@ const PopularDestinations = () => {
       
       // 원본 도시 정보에서 description 가져오기
       const originalDest = POPULAR_DESTINATIONS.find(d => d.id === destination.id);
-      const description = originalDest?.description || '';
+      let description = originalDest?.description || '';
+      
+      // 검색으로 들어온 도시는 여러 소스에서 설명 가져오기
+      if (!description) {
+        // 1. Google Places API의 editorialSummary
+        if (data.editorialSummary) {
+          description = data.editorialSummary?.text || data.editorialSummary || '';
+        }
+        
+        // 2. 위키백과에서 설명 가져오기
+        if (!description || description.length < 50) {
+          const wikiDesc = await fetchWikipediaDescription(destination.name);
+          if (wikiDesc) {
+            description = wikiDesc;
+          }
+        }
+      }
+      
+      // 설명이 없으면 기본 메시지
+      if (!description || description.length < 20) {
+        description = `${destination.name}은(는) 매력적인 여행지입니다. 이 도시를 탐험하며 특별한 경험을 만들어보세요.`;
+      }
       
       setDestinationDetails({
         displayName: data.displayName?.text || destination.name,
-        formattedAddress: data.formattedAddress || '',
+        formattedAddress: data.formattedAddress || destination.country || '',
         editorialSummary: description,
         photos: data.photos || [],
       });
@@ -350,11 +503,27 @@ const PopularDestinations = () => {
       
       // 에러 발생 시에도 description 가져오기
       const originalDest = POPULAR_DESTINATIONS.find(d => d.id === destination.id);
-      const description = originalDest?.description || '상세 정보를 불러올 수 없습니다.';
+      let description = originalDest?.description || '';
+      
+      // 위키백과 재시도
+      if (!description) {
+        try {
+          const wikiDesc = await fetchWikipediaDescription(destination.name);
+          if (wikiDesc) {
+            description = wikiDesc;
+          }
+        } catch {
+          description = `${destination.name}에 대한 정보를 불러오는 중 문제가 발생했습니다.`;
+        }
+      }
+      
+      if (!description) {
+        description = `${destination.name}에 대한 정보를 불러오는 중 문제가 발생했습니다.`;
+      }
       
       setDestinationDetails({
         displayName: destination.name,
-        formattedAddress: '',
+        formattedAddress: destination.country || '',
         editorialSummary: description,
         photos: [],
       });
@@ -366,6 +535,85 @@ const PopularDestinations = () => {
   const closeModal = () => {
     setSelectedDestination(null);
     setDestinationDetails(null);
+  };
+
+  // 도시 검색 함수
+  const handleSearch = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchDropdown(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    setShowSearchDropdown(true);
+
+    try {
+      const data = await fetchJsonWithRetry(
+        '/api/places/autocomplete',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ q: query })
+        },
+        { retries: 2, backoffMs: 500, maxBackoffMs: 2000, label: `Search ${query}` }
+      );
+
+      console.log('Search API response:', data); // 디버깅용
+
+      const normalized = data.normalizedSuggestions || [];
+      
+      // 타입 필터링 없이 모든 결과 표시 (도시뿐만 아니라 관련된 모든 장소)
+      // 또는 타입 체크를 더 유연하게
+      const cities = normalized.filter(item => {
+        const types = item.types || [];
+        // 더 많은 타입 허용
+        return types.length === 0 || // 타입 정보가 없어도 허용
+               types.includes('locality') || 
+               types.includes('administrative_area_level_1') ||
+               types.includes('administrative_area_level_2') ||
+               types.includes('administrative_area_level_3') ||
+               types.includes('postal_town') ||
+               types.includes('sublocality') ||
+               types.includes('neighborhood');
+      });
+
+      console.log('Filtered cities:', cities); // 디버깅용
+      setSearchResults(cities.slice(0, 10)); // 최대 10개만 표시
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // 검색 결과 선택 시
+  const handleSearchResultClick = async (result) => {
+    setShowSearchDropdown(false);
+    setSearchQuery('');
+    
+    console.log('Selected search result:', result); // 디버깅용
+    
+    // API 응답 구조에 맞게 도시 이름 추출
+    const cityName = result.text || result.mainText || result.displayName?.text || result.displayName || 'Unknown City';
+    const countryName = result.secondaryText || '';
+    
+    // 선택한 도시의 상세 정보를 가져와서 모달로 표시
+    const cityData = {
+      id: `search-${result.placeId}`,
+      name: cityName,
+      country: countryName,
+      placeId: result.placeId,
+      displayName: cityName,
+      photoUrl: null,
+      location: null,
+      summary: '',
+    };
+    
+    console.log('City data for modal:', cityData); // 디버깅용
+    
+    await handleCardClick(cityData);
   };
 
   if (loading) {
@@ -387,9 +635,91 @@ const PopularDestinations = () => {
   return (
     <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>
           <p className="text-gray-600 text-lg">전 세계에서 가장 사랑받는 여행지를 둘러보세요</p>
+        </div>
+
+        {/* 검색창 */}
+        <div className="max-w-2xl mx-auto mb-12 relative">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                if (!isComposing) {
+                  handleSearch(e.target.value);
+                }
+              }}
+              onCompositionStart={() => setIsComposing(true)}
+              onCompositionUpdate={() => setIsComposing(true)}
+              onCompositionEnd={(e) => {
+                setIsComposing(false);
+                handleSearch(e.target.value);
+              }}
+              onFocus={() => {
+                if (searchQuery.trim().length >= 2) {
+                  setShowSearchDropdown(true);
+                }
+              }}
+              onBlur={() => {
+                // 드롭다운 항목 클릭을 위해 약간의 딜레이
+                setTimeout(() => setShowSearchDropdown(false), 200);
+              }}
+              placeholder="여기에 없는 도시를 검색해보세요 (예: 암스테르담, 두바이, 상하이...)"
+              className="w-full px-6 py-4 text-lg border-2 border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-md"
+            />
+            <div className="absolute right-4 top-1/2 -translate-y-1/2">
+              {searchLoading ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
+              ) : (
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              )}
+            </div>
+          </div>
+
+          {/* 검색 결과 드롭다운 */}
+          {showSearchDropdown && searchResults.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl max-h-96 overflow-y-auto z-50">
+              {searchResults.map((result, index) => {
+                // 도시명, 국가명 추출
+                const cityName = result.text || result.mainText || '';
+                const countryInfo = result.secondaryText || '';
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleSearchResultClick(result)}
+                    className="w-full px-6 py-4 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-center gap-3"
+                  >
+                    <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-800">
+                        {cityName}{countryInfo ? `, ${countryInfo}` : ''}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 검색 결과 없음 */}
+          {showSearchDropdown && !searchLoading && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl p-6 text-center z-50">
+              <svg className="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-gray-500">검색 결과가 없습니다</p>
+              <p className="text-sm text-gray-400 mt-1">다른 검색어를 시도해보세요</p>
+            </div>
+          )}
         </div>
 
         {/* 카드 그리드 */}
