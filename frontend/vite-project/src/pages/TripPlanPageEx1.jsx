@@ -308,6 +308,9 @@ const TripPlanPageEx1 = () => {
   // 선택된 장소 목록
   const [selectedPlaces, setSelectedPlaces] = useState([]); // [{id, name, category, address, image, likes, rating, lat, lng, stayHours, stayMinutes}]
   
+  // 선택된 숙소 목록 (부모로 이동)
+  const [selectedAccommodations, setSelectedAccommodations] = useState([]); // {dayIndex, accommodation}
+  
   // 장소 상세 모달 상태
   const [placeDetailModal, setPlaceDetailModal] = useState(null); // 선택된 장소의 상세 정보
   
@@ -1177,6 +1180,10 @@ const TripPlanPageEx1 = () => {
   );
   };
 
+  // 이동수단 선택 모달
+  const [transportModal, setTransportModal] = useState(false);
+  const [selectedTransport, setSelectedTransport] = useState(null); // 'public', 'car', 'walk'
+
   // 숙소 선택 모드 (step 3)
   const AccommodationMode = () => {
     const [accommodationQuery, setAccommodationQuery] = useState('');
@@ -1184,7 +1191,7 @@ const TripPlanPageEx1 = () => {
     const [isComposing, setIsComposing] = useState(false);
     const [accommodations, setAccommodations] = useState([]);
     const [accommodationsLoading, setAccommodationsLoading] = useState(false);
-    const [selectedAccommodations, setSelectedAccommodations] = useState([]); // {dayIndex, accommodation}
+    // selectedAccommodations는 이제 부모 컴포넌트에서 관리
     const [accommodationModal, setAccommodationModal] = useState(false);
     const [accommodationDetailModal, setAccommodationDetailModal] = useState(null); // 숙소 상세 모달
     const [selectedPanelOpen, setSelectedPanelOpen] = useState(true);
@@ -1381,7 +1388,7 @@ const TripPlanPageEx1 = () => {
               이전
             </button>
             <button 
-              onClick={() => alert('일정 저장 기능 구현 예정')} 
+              onClick={() => setStep(4)} 
               className="w-full px-3 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-semibold transition-colors"
             >
               완료
@@ -1510,7 +1517,7 @@ const TripPlanPageEx1 = () => {
                           e.stopPropagation();
                           openDaySelectionModal(acc);
                         }}
-                        className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors bg-blue-600 hover:bg-blue-700 text-white"
+                        className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors bg-gray-100 text-gray-400 hover:bg-gray-200"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -1912,6 +1919,322 @@ const TripPlanPageEx1 = () => {
     );
   };
 
+  // 일정 생성 모드 (step 4)
+  const ScheduleGenerationMode = () => {
+    return (
+      <div className="relative w-full h-screen">
+        {/* 배경 지도 */}
+        <div className="absolute inset-0">
+          <DirectSearchMap
+            centerLat={selectedDestination.lat}
+            centerLng={selectedDestination.lng}
+            selectedPlaces={selectedPlaces}
+            selectedAccommodations={selectedAccommodations}
+          />
+        </div>
+
+        {/* 왼쪽 일정 생성 패널 (단계 패널 없음) */}
+        <div className="absolute left-0 top-0 bottom-0 w-[650px] bg-white shadow-2xl text-left flex flex-col z-10">
+          {/* 헤더 */}
+          <div className="p-6 pb-4 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center gap-3 mb-3">
+              <button 
+                onClick={() => setStep(3)} 
+                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 className="text-2xl font-bold text-gray-800">일정 생성</h2>
+            </div>
+            <p className="text-sm text-gray-600 ml-11">
+              선택한 정보를 바탕으로 최적의 여행 일정을 생성합니다
+            </p>
+          </div>
+
+          {/* 여행 정보 요약 */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="space-y-6">
+              {/* 기본 정보 */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">기본 정보</h3>
+                <div className="space-y-4">
+                  {/* 여행지 */}
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">여행지</div>
+                    <div className="text-lg font-bold text-gray-800">{selectedDestination.name}</div>
+                  </div>
+                  
+                  {/* 기간 */}
+                  <div>
+                    <div className="text-xs text-gray-500 mb-1">여행 기간</div>
+                    <div className="text-base font-semibold text-gray-800">{dateRange}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 선택한 장소 */}
+              <div className="bg-blue-50 rounded-lg p-4">
+                <div className="mb-3">
+                  <h3 className="text-lg font-semibold text-gray-800">선택한 장소 <span className="text-blue-600">{selectedPlaces.length}</span></h3>
+                </div>
+                
+                {/* 가로 스크롤 장소 목록 */}
+                <div className="overflow-x-auto pb-2 -mx-2 px-2">
+                  <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+                    {selectedPlaces.map((place, index) => (
+                      <div key={place.id} className="flex-shrink-0 w-[140px]">
+                        <div className="bg-white rounded-lg overflow-hidden border border-blue-200 shadow-sm">
+                          {/* 장소 이미지 */}
+                          <div className="relative">
+                            <img 
+                              src={place.image} 
+                              alt={place.name}
+                              className="w-full h-[100px] object-cover"
+                              onError={(e) => {
+                                if (!e.target.src.startsWith('data:')) {
+                                  e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTQwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWNhM2FmIiBkeT0iLjNlbSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                                }
+                              }}
+                            />
+                            {/* 번호 배지 */}
+                            <div className="absolute top-2 left-2 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shadow">
+                              {index + 1}
+                            </div>
+                          </div>
+                          {/* 장소 정보 */}
+                          <div className="p-2">
+                            <div className="font-medium text-sm text-gray-800 truncate mb-1" title={place.name}>
+                              {place.name}
+                            </div>
+                            <div className="text-xs text-gray-500 truncate">
+                              {place.category}
+                            </div>
+                            <div className="text-xs text-blue-600 mt-1">
+                              {place.stayHours}시간 {place.stayMinutes}분
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 선택한 숙소 */}
+              <div className="bg-green-50 rounded-lg p-4">
+                <div className="mb-3">
+                  <h3 className="text-lg font-semibold text-gray-800">선택한 숙소 <span className="text-green-600">{selectedAccommodations.length}</span></h3>
+                </div>
+                
+                {/* 가로 스크롤 숙소 목록 */}
+                <div className="overflow-x-auto pb-2 -mx-2 px-2">
+                  <div className="flex gap-3" style={{ minWidth: 'max-content' }}>
+                    {selectedAccommodations.map((acc) => {
+                      // 날짜 계산
+                      const date = new Date(startDate);
+                      date.setDate(date.getDate() + acc.dayIndex);
+                      const month = String(date.getMonth() + 1).padStart(2, '0');
+                      const day = String(date.getDate()).padStart(2, '0');
+                      const days = ['일', '월', '화', '수', '목', '금', '토'];
+                      const dayOfWeek = days[date.getDay()];
+                      
+                      return (
+                        <div key={`${acc.accommodation.id}-${acc.dayIndex}`} className="flex-shrink-0 w-[140px]">
+                          <div className="bg-white rounded-lg overflow-hidden border border-green-200 shadow-sm">
+                            {/* 숙소 이미지 */}
+                            <div className="relative">
+                              <img 
+                                src={acc.accommodation.image} 
+                                alt={acc.accommodation.name}
+                                className="w-full h-[100px] object-cover"
+                                onError={(e) => {
+                                  if (!e.target.src.startsWith('data:')) {
+                                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTQwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2U1ZTdlYiIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LXNpemU9IjEyIiBmaWxsPSIjOWNhM2FmIiBkeT0iLjNlbSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+                                  }
+                                }}
+                              />
+                              {/* DAY 배지 */}
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-green-600 text-white text-xs font-bold shadow">
+                                DAY {acc.dayIndex + 1}
+                              </div>
+                            </div>
+                            {/* 숙소 정보 */}
+                            <div className="p-2">
+                              <div className="text-xs text-green-600 mb-1">
+                                {month}/{day}({dayOfWeek})
+                              </div>
+                              <div className="font-medium text-sm text-gray-800 truncate" title={acc.accommodation.name}>
+                                {acc.accommodation.name}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          {/* 하단 일정 생성 버튼 */}
+          <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <button
+              onClick={() => setTransportModal(true)}
+              className="w-full px-6 py-4 bg-black hover:bg-gray-800 text-white font-bold text-lg rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
+            >
+              일정 생성하기
+            </button>
+          </div>
+        </div>
+
+        {/* 이동수단 선택 모달 */}
+        {transportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl w-[500px] max-h-[80vh] flex flex-col">
+              {/* 헤더 */}
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-semibold text-gray-800">이동수단을 선택하세요</h3>
+                  <button
+                    onClick={() => setTransportModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">
+                  선택하신 이동수단에 따라 최적의 경로와 시간을 계산합니다
+                </p>
+              </div>
+
+              {/* 이동수단 선택 */}
+              <div className="flex-1 overflow-y-auto px-6 py-6">
+                <div className="space-y-3">
+                  {/* 대중교통 */}
+                  <button
+                    onClick={() => setSelectedTransport('public')}
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                      selectedTransport === 'public'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      selectedTransport === 'public' ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}>
+                      <svg className={`w-6 h-6 ${selectedTransport === 'public' ? 'text-white' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-lg font-semibold text-gray-800">대중교통</div>
+                      <div className="text-sm text-gray-600">지하철, 버스 등 대중교통 이용</div>
+                    </div>
+                    {selectedTransport === 'public' && (
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* 자동차 */}
+                  <button
+                    onClick={() => setSelectedTransport('car')}
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                      selectedTransport === 'car'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      selectedTransport === 'car' ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}>
+                      <svg className={`w-6 h-6 ${selectedTransport === 'car' ? 'text-white' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-lg font-semibold text-gray-800">자동차</div>
+                      <div className="text-sm text-gray-600">렌트카 또는 개인 차량 이용</div>
+                    </div>
+                    {selectedTransport === 'car' && (
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+
+                  {/* 도보 */}
+                  <button
+                    onClick={() => setSelectedTransport('walk')}
+                    className={`w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-all ${
+                      selectedTransport === 'walk'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                      selectedTransport === 'walk' ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}>
+                      <svg className={`w-6 h-6 ${selectedTransport === 'walk' ? 'text-white' : 'text-gray-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-lg font-semibold text-gray-800">도보</div>
+                      <div className="text-sm text-gray-600">걸어서 이동 (가까운 거리)</div>
+                    </div>
+                    {selectedTransport === 'walk' && (
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* 푸터 - 확인 버튼 */}
+              <div className="px-6 py-4 border-t border-gray-200">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setTransportModal(false)}
+                    className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!selectedTransport) {
+                        alert('이동수단을 선택해주세요.');
+                        return;
+                      }
+                      setTransportModal(false);
+                      alert(`${selectedTransport === 'public' ? '대중교통' : selectedTransport === 'car' ? '자동차' : '도보'}으로 일정을 생성합니다. (구현 예정)`);
+                    }}
+                    disabled={!selectedTransport}
+                    className={`flex-1 px-4 py-3 font-semibold rounded-lg transition-colors ${
+                      !selectedTransport
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    확인
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // AI 모드 본문(목업)
   const AiMode = () => (
     <div className="bg-white p-6 rounded-lg shadow-md max-w-4xl mx-auto text-left">
@@ -2057,6 +2380,7 @@ const TripPlanPageEx1 = () => {
         )}
         {step === 2 && (mode === 'direct' ? <DirectMode /> : <AiMode />)}
         {step === 3 && <AccommodationMode />}
+        {step === 4 && <ScheduleGenerationMode />}
       </div>
 
       {hasUnsavedChanges && (
@@ -2474,7 +2798,7 @@ function MapPreview({ selectedDestination }) {
 }
 
 // Google Maps 지도 (Legacy API 호출 제거, 선택된 장소 마커만 표시)
-function DirectSearchMap({ centerLat, centerLng, selectedPlaces }) {
+function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommodations }) {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID; // 선택적 mapId
   const mapRef = React.useRef(null);
@@ -2604,9 +2928,53 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces }) {
       }
     });
 
-    console.log(`Total markers created: ${markersRef.current.length}`);
+    console.log(`Total place markers created: ${markersRef.current.length}`);
 
-    // 장소들을 순서대로 선으로 연결
+    // 숙소 마커 추가 (연두색, 선으로 연결하지 않음)
+    const accommodationsList = Array.isArray(selectedAccommodations) ? selectedAccommodations : [];
+    console.log('Creating accommodation markers:', accommodationsList);
+
+    accommodationsList.forEach((acc) => {
+      const accommodation = acc.accommodation;
+      if (typeof accommodation.lat === 'number' && typeof accommodation.lng === 'number') {
+        const pos = { lat: accommodation.lat, lng: accommodation.lng };
+        const dayNumber = acc.dayIndex + 1;
+        
+        try {
+          // 연두색 숙소 마커 생성
+          const marker = new maps.Marker({
+            position: pos,
+            map: mapRefInstance.current,
+            title: `DAY ${dayNumber}: ${accommodation.name}`,
+            label: {
+              text: String(dayNumber),
+              color: 'white',
+              fontSize: '14px',
+              fontWeight: 'bold'
+            },
+            icon: {
+              path: maps.SymbolPath.CIRCLE,
+              scale: 15,
+              fillColor: '#84cc16', // 연두색 (lime-500)
+              fillOpacity: 1,
+              strokeColor: 'white',
+              strokeWeight: 2,
+            }
+          });
+          
+          console.log(`Accommodation marker ${dayNumber} created successfully at`, pos);
+          markersRef.current.push(marker);
+        } catch (error) {
+          console.error(`Error creating accommodation marker ${dayNumber}:`, error);
+        }
+      } else {
+        console.warn(`Accommodation ${accommodation.name} has invalid coordinates:`, accommodation.lat, accommodation.lng);
+      }
+    });
+
+    console.log(`Total markers created (places + accommodations): ${markersRef.current.length}`);
+
+    // 장소들을 순서대로 선으로 연결 (숙소는 제외)
     if (selectedPlacesList.length > 1) {
       const pathCoordinates = [];
       
@@ -2625,63 +2993,71 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces }) {
           strokeWeight: 3,
         });
         polylineRef.current.setMap(mapRefInstance.current);
-        console.log('Polyline created connecting', pathCoordinates.length, 'points');
+        console.log('Polyline created connecting', pathCoordinates.length, 'places');
       }
     }
 
-    // 선택된 장소들이 모두 보이도록 지도 범위 조정 (왼쪽 패널 고려)
-    if (selectedPlacesList.length > 0) {
-      const bounds = new maps.LatLngBounds();
-      let validCoords = 0;
-      
-      selectedPlacesList.forEach((place) => {
-        if (typeof place.lat === 'number' && typeof place.lng === 'number') {
-          bounds.extend({ lat: place.lat, lng: place.lng });
-          validCoords++;
-        }
-      });
-      
-      console.log(`Valid coordinates for bounds: ${validCoords}`);
-      
-      if (validCoords > 0) {
-        // 장소가 1개일 경우
-        if (validCoords === 1) {
-          const center = bounds.getCenter();
+    // 선택된 장소와 숙소가 모두 보이도록 지도 범위 조정 (왼쪽 패널 고려)
+    const bounds = new maps.LatLngBounds();
+    let validCoords = 0;
+    
+    // 장소 좌표 추가
+    selectedPlacesList.forEach((place) => {
+      if (typeof place.lat === 'number' && typeof place.lng === 'number') {
+        bounds.extend({ lat: place.lat, lng: place.lng });
+        validCoords++;
+      }
+    });
+    
+    // 숙소 좌표 추가
+    accommodationsList.forEach((acc) => {
+      const accommodation = acc.accommodation;
+      if (typeof accommodation.lat === 'number' && typeof accommodation.lng === 'number') {
+        bounds.extend({ lat: accommodation.lat, lng: accommodation.lng });
+        validCoords++;
+      }
+    });
+
+    console.log(`Valid coordinates for bounds: ${validCoords}`);
+    
+    if (validCoords > 0) {
+      // 장소가 1개일 경우
+      if (validCoords === 1) {
+        const center = bounds.getCenter();
+        
+        // 픽셀 단위로 중심점을 오른쪽으로 이동
+        const projection = mapRefInstance.current.getProjection();
+        const zoom = 14;
+        mapRefInstance.current.setZoom(zoom);
+        
+        // 왼쪽 패널 너비만큼 오른쪽으로 오프셋 (약 650px)
+        // 지도 전체 너비의 약 1/4 정도 왼쪽으로 치우치게
+        if (projection) {
+          const scale = Math.pow(2, zoom);
+          const worldCoordinate = projection.fromLatLngToPoint(center);
+          const pixelOffset = 325 / (256 * scale); // 왼쪽으로 325픽셀 정도 오프셋
           
-          // 픽셀 단위로 중심점을 오른쪽으로 이동
-          const projection = mapRefInstance.current.getProjection();
-          const zoom = 14;
-          mapRefInstance.current.setZoom(zoom);
-          
-          // 왼쪽 패널 너비만큼 오른쪽으로 오프셋 (약 510px = 단계패널 110px + 장소패널 400px)
-          // 지도 전체 너비의 약 1/4 정도 왼쪽으로 치우치게
-          if (projection) {
-            const scale = Math.pow(2, zoom);
-            const worldCoordinate = projection.fromLatLngToPoint(center);
-            const pixelOffset = 250 / (256 * scale); // 왼쪽으로 250픽셀 정도 오프셋
-            
-            const newCenter = projection.fromPointToLatLng(
-              new maps.Point(
-                worldCoordinate.x + pixelOffset,
-                worldCoordinate.y
-              )
-            );
-            mapRefInstance.current.setCenter(newCenter);
-          } else {
-            mapRefInstance.current.setCenter(center);
-          }
+          const newCenter = projection.fromPointToLatLng(
+            new maps.Point(
+              worldCoordinate.x + pixelOffset,
+              worldCoordinate.y
+            )
+          );
+          mapRefInstance.current.setCenter(newCenter);
         } else {
-          // 2개 이상일 경우 범위 조정 후 중심 이동
-          mapRefInstance.current.fitBounds(bounds, {
-            top: 50,
-            right: 50,
-            bottom: 50,
-            left: 560 // 왼쪽에 더 큰 패딩 (단계패널 110px + 장소패널 400px + 여유 50px)
-          });
+          mapRefInstance.current.setCenter(center);
         }
+      } else {
+        // 2개 이상일 경우 범위 조정 후 중심 이동
+        mapRefInstance.current.fitBounds(bounds, {
+          top: 50,
+          right: 50,
+          bottom: 50,
+          left: 700 // 왼쪽에 더 큰 패딩 (일정생성패널 650px + 여유 50px)
+        });
       }
     }
-  }, [selectedPlaces, mapId, mapReady]);
+  }, [selectedPlaces, selectedAccommodations, mapId, mapReady]);
 
   // 중심 이동
   React.useEffect(() => {

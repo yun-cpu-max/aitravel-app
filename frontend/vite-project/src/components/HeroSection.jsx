@@ -11,6 +11,9 @@ import React from 'react';
 // React Router DOM import (라우팅 관련)
 import { useNavigate } from 'react-router-dom';
 
+// 인증 관련 커스텀 훅 import
+import { useAuth } from '../hooks/useAuth';
+
 /**
  * HeroSection 컴포넌트
  * - 홈페이지의 메인 섹션을 렌더링
@@ -21,13 +24,22 @@ import { useNavigate } from 'react-router-dom';
 const HeroSection = () => {
   // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
+  
+  // 인증 관련 상태와 함수들을 가져옴
+  const { isAuthenticated } = useAuth();
 
   /**
    * 여행 계획 시작 버튼 클릭 핸들러
-   * - 여행 계획 페이지로 이동
+   * - 로그인 상태 확인 후 여행 계획 페이지로 이동
+   * - 로그인하지 않았으면 로그인 페이지로 리다이렉트
    */
   const handleStartPlan = () => {
-    navigate('/trip-plan-ex1');
+    if (isAuthenticated()) {
+      navigate('/trip-plan-ex1');
+    } else {
+      // 로그인 후 여행 계획 페이지로 돌아올 수 있도록 state 전달
+      navigate('/login', { state: { from: '/trip-plan-ex1' } });
+    }
   };
 
   return (

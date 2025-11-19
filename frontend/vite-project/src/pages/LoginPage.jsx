@@ -8,7 +8,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 // React Router DOM import (라우팅 관련)
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // 인증 관련 커스텀 훅 import
 import { useAuth } from '../hooks/useAuth';
@@ -22,6 +22,10 @@ import { useAuth } from '../hooks/useAuth';
 const LoginPage = () => {
   // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
+  
+  // 이전 페이지 정보를 가져옴
+  const location = useLocation();
+  const from = location.state?.from || '/profile';
   
   // 인증 관련 함수들을 가져옴
   const { login } = useAuth();
@@ -77,7 +81,7 @@ const LoginPage = () => {
         });
         
         if (result.success) {
-          navigate('/profile');
+          navigate(from);
         } else {
           setError('로그인 처리에 실패했습니다.');
         }
@@ -91,7 +95,7 @@ const LoginPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [login, navigate]);
+  }, [login, navigate, from]);
   
   // Google Identity Services 스크립트 로드
   useEffect(() => {
@@ -200,7 +204,7 @@ const LoginPage = () => {
           createdAt: data.user.createdAt,
           updatedAt: data.user.updatedAt
         });
-        if (result.success) navigate('/profile');
+        if (result.success) navigate(from);
       } else {
         // 로그인 실패
         setError(data.message || '로그인에 실패했습니다.');

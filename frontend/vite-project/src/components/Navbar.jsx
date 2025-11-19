@@ -38,6 +38,20 @@ const Navbar = ({ onOpenModal }) => {
     logout();
     navigate('/');
   };
+
+  /**
+   * 여행 계획하기 버튼 클릭 핸들러
+   * - 로그인 상태 확인 후 여행 계획 페이지로 이동
+   * - 로그인하지 않았으면 로그인 페이지로 리다이렉트
+   */
+  const handleTripPlan = () => {
+    if (isAuthenticated()) {
+      navigate('/trip-plan-ex1');
+    } else {
+      // 로그인 후 여행 계획 페이지로 돌아올 수 있도록 state 전달
+      navigate('/login', { state: { from: '/trip-plan-ex1' } });
+    }
+  };
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       {/* max-w-7xl -> max-w-full로 변경 */}
@@ -65,12 +79,12 @@ const Navbar = ({ onOpenModal }) => {
               </button>
               
               {/* 여행 계획하기 버튼 */}
-              <Link
-                to="/trip-plan-ex1"
+              <button
+                onClick={handleTripPlan}
                 className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-bold transition-colors duration-200"
               >
                 여행 계획하기
-              </Link>
+              </button>
 
               {/* 인증 상태에 따른 버튼 표시 */}
               {isAuthenticated() ? (
