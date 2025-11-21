@@ -535,6 +535,7 @@ const PopularDestinations = () => {
   const closeModal = () => {
     setSelectedDestination(null);
     setDestinationDetails(null);
+    setDetailsLoading(false);
   };
 
   // 도시 검색 함수
@@ -590,9 +591,6 @@ const PopularDestinations = () => {
 
   // 검색 결과 선택 시
   const handleSearchResultClick = async (result) => {
-    setShowSearchDropdown(false);
-    setSearchQuery('');
-    
     console.log('Selected search result:', result); // 디버깅용
     
     // API 응답 구조에 맞게 도시 이름 추출
@@ -612,6 +610,11 @@ const PopularDestinations = () => {
     };
     
     console.log('City data for modal:', cityData); // 디버깅용
+    
+    // 검색 상태 초기화 (모달 열기 전에)
+    setShowSearchDropdown(false);
+    setSearchQuery('');
+    setSearchResults([]);
     
     await handleCardClick(cityData);
   };
@@ -692,7 +695,10 @@ const PopularDestinations = () => {
                 return (
                   <button
                     key={index}
-                    onClick={() => handleSearchResultClick(result)}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // blur 이벤트 방지
+                      handleSearchResultClick(result);
+                    }}
                     className="w-full px-6 py-4 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0 flex items-center gap-3"
                   >
                     <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -825,7 +831,7 @@ const PopularDestinations = () => {
                         // 여행 계획 페이지로 이동하며 해당 도시 정보 전달
                         window.location.href = `/trip-plan-ex1?city=${encodeURIComponent(selectedDestination.name)}&placeId=${encodeURIComponent(selectedDestination.placeId)}`;
                       }}
-                      className="flex-1 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
+                      className="flex-1 bg-black hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300"
                     >
                       이 도시로 여행 계획 시작하기
                     </button>
