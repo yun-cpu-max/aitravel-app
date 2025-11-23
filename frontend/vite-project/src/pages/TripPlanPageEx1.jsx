@@ -1927,6 +1927,198 @@ const TripPlanPageEx1 = () => {
     );
   };
 
+  // 일정 분배 알고리즘
+  const distributePlacesToDays = (places, accommodations, startDate, endDate, dailyTimeSettings) => {
+    const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+    
+    // 거리 계산 (Haversine)
+    const getDist = (loc1, loc2) => {
+      if (!loc1 || !loc2 || !loc1.lat || !loc1.lng || !loc2.lat || !loc2.lng) return 99999;
+      const R = 6371;
+      const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
+      const dLng = (loc2.lng - loc1.lng) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
+                Math.sin(dLng/2) * Math.sin(dLng/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    };
+
+    // --- [Step 1] 각 날짜별 숙소 위치 & 가용 시간 설정 ---
+    const dayInfo = [];
+    for (let i = 0; i < totalDays; i++) {
+      const dayAcc = accommodations.find(acc => acc.dayIndex === i);
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      const settings = dailyTimeSettings[dateKey] || { startTime: '10:00', endTime: '22:00' };
+      
+      const [startH, startM] = settings.startTime.split(':').map(Number);
+      const [endH, endM] = settings.endTime.split(':').map(Number);
+      const totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+      
+      // 숙소 위치 (없으면 이전 날짜 숙소 사용)
+      let location = null;
+      if (dayAcc && dayAcc.accommodation.lat && dayAcc.accommodation.lng) {
+        location = { lat: dayAcc.accommodation.lat, lng: dayAcc.accommodation.lng };
+      } else if (i > 0 && dayInfo[i-1].location) {
+        location = dayInfo[i-1].location;
+      }
+      
+      dayInfo.push({
+        location,
+        startTime: startH * 60 + startM,
+        endTime: endH * 60 + endM,
+        availableMinutes: Math.floor(totalMinutes * 0.75), // 이동시간 25% 예약
+        items: []
+      });
+    }
+
+    // --- [Step 2] 클러스터링: 각 장소를 가장 가까운 날짜에 가배정 ---
+    const clusteredPlaces = places.map(place => {
+      let bestDay = 0;
+      let minDistance = 99999;
+
+      dayInfo.forEach((info, index) => {
+        if (info.location) {
+          const dist = getDist(info.location, place);
+          if (dist < minDistance) {
+            minDistance = dist;
+            bestDay = index;
+          }
+        }
+      });
+      
+      return { ...place, assignedDay: bestDay };
+    });
+
+    // --- [Step 3] 일차별 동선 최적화 (Nearest Neighbor + 카테고리 밸런싱) ---
+    const finalPlans = Array.from({ length: totalDays }, () => []);
+    const leftovers = [];
+
+    for (let dayIdx = 0; dayIdx < totalDays; dayIdx++) {
+      const info = dayInfo[dayIdx];
+      if (!info.location) continue;
+
+      let candidates = clusteredPlaces.filter(p => p.assignedDay === dayIdx);
+      let currentLoc = info.location;
+      let elapsedMinutes = 0;
+
+      // 식당/카페를 식사 시간대에 우선 배치
+      const restaurants = candidates.filter(p => p.category === '식당');
+
+      let orderedCandidates = [];
+
+      // 점심 시간대(12:00)에 식당 하나 예약
+      const lunchTime = 720; // 12:00
+      if (restaurants.length > 0 && info.startTime < lunchTime && info.endTime > lunchTime) {
+        const lunchPlace = restaurants.sort((a, b) => getDist(currentLoc, a) - getDist(currentLoc, b))[0];
+        orderedCandidates.push({ place: lunchPlace, preferredTime: lunchTime });
+        candidates = candidates.filter(p => p.id !== lunchPlace.id);
+      }
+
+      // 저녁 시간대(18:00)에 식당 하나 예약
+      const dinnerTime = 1080; // 18:00
+      const remainingRestaurants = candidates.filter(p => p.category === '식당');
+      if (remainingRestaurants.length > 0 && info.endTime > dinnerTime) {
+        const dinnerPlace = remainingRestaurants.sort((a, b) => getDist(currentLoc, a) - getDist(currentLoc, b))[0];
+        orderedCandidates.push({ place: dinnerPlace, preferredTime: dinnerTime });
+        candidates = candidates.filter(p => p.id !== dinnerPlace.id);
+      }
+
+      // 나머지는 Nearest Neighbor로 채우기
+      orderedCandidates.push(...candidates.map(p => ({ place: p, preferredTime: null })));
+
+      // Nearest Neighbor 라우팅
+      while (orderedCandidates.length > 0) {
+        // preferredTime이 있는 것 우선, 없으면 거리순
+        orderedCandidates.sort((a, b) => {
+          if (a.preferredTime && !b.preferredTime) return -1;
+          if (!a.preferredTime && b.preferredTime) return 1;
+          if (a.preferredTime && b.preferredTime) return a.preferredTime - b.preferredTime;
+          return getDist(currentLoc, a.place) - getDist(currentLoc, b.place);
+        });
+
+        const { place } = orderedCandidates[0];
+        const placeMinutes = (place.stayHours || 2) * 60 + (place.stayMinutes || 0);
+
+        // 시간 초과 체크
+        if (elapsedMinutes + placeMinutes > info.availableMinutes) {
+          leftovers.push(...orderedCandidates.map(c => c.place));
+          break;
+        }
+
+        // 카테고리 연속 방지
+        const lastPlace = finalPlans[dayIdx][finalPlans[dayIdx].length - 1];
+        const isSameCategory = lastPlace && 
+          ['식당', '카페'].includes(lastPlace.category) && 
+          place.category === lastPlace.category;
+
+        if (!isSameCategory) {
+          finalPlans[dayIdx].push(place);
+          elapsedMinutes += placeMinutes;
+          currentLoc = { lat: place.lat, lng: place.lng };
+        } else {
+          // 같은 카테고리면 leftovers로
+          leftovers.push(place);
+        }
+
+        orderedCandidates.shift();
+      }
+    }
+
+    // --- [Step 4] 남은 장소 재분배 (거리 + 시간 모두 고려) ---
+    for (const place of leftovers) {
+      let bestDayIndex = -1;
+      let bestScore = -Infinity;
+
+      for (let i = 0; i < totalDays; i++) {
+        if (!dayInfo[i].location) continue;
+        
+        const usedMinutes = finalPlans[i].reduce((sum, p) => 
+          sum + (p.stayHours || 2) * 60 + (p.stayMinutes || 0), 0);
+        const freeMinutes = dayInfo[i].availableMinutes - usedMinutes;
+        
+        // 거리 계산 (해당 날짜 숙소로부터)
+        const distance = getDist(dayInfo[i].location, place);
+        
+        // 점수 계산: 시간 여유가 많고 거리가 가까울수록 높음
+        // - 시간 여유: 분당 +1점
+        // - 거리: km당 -10점
+        // - 20km 이상이면 큰 페널티
+        const distancePenalty = distance > 20 ? -500 : 0;
+        const score = freeMinutes - (distance * 10) + distancePenalty;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestDayIndex = i;
+        }
+      }
+
+      const placeMinutes = (place.stayHours || 2) * 60 + (place.stayMinutes || 0);
+      
+      // 점수가 양수이고, 시간이 충분하면 배치
+      if (bestDayIndex !== -1 && bestScore > 0) {
+        const usedMinutes = finalPlans[bestDayIndex].reduce((sum, p) => 
+          sum + (p.stayHours || 2) * 60 + (p.stayMinutes || 0), 0);
+        const freeMinutes = dayInfo[bestDayIndex].availableMinutes - usedMinutes;
+        
+        if (freeMinutes >= placeMinutes) {
+          finalPlans[bestDayIndex].push(place);
+          console.log(`✅ ${place.name} → ${bestDayIndex + 1}일차 재배치 (거리: ${getDist(dayInfo[bestDayIndex].location, place).toFixed(1)}km)`);
+        } else {
+          console.warn(`⚠️ ${place.name} - 시간 부족으로 제외`);
+        }
+      } else {
+        console.warn(`⚠️ ${place.name} - 너무 멀거나 적합한 날짜 없음 (최고 점수: ${bestScore.toFixed(0)})`);
+      }
+    }
+
+    return finalPlans;
+  };
+
+  // 분배된 일정 저장 상태
+  const [distributedSchedule, setDistributedSchedule] = useState([]);
+
   // 일정 생성 모드 (step 4)
   const ScheduleGenerationMode = () => {
     // 일정이 생성되면 일정 표시 화면으로 전환
@@ -2096,7 +2288,14 @@ const TripPlanPageEx1 = () => {
           {/* 하단 일정 생성 버튼 */}
           <div className="p-6 border-t border-gray-200 bg-gray-50">
             <button
-              onClick={() => setTransportModal(true)}
+              onClick={() => {
+                // 일정 생성 전 검증
+                if (selectedPlaces.length === 0) {
+                  alert('최소 하나 이상의 장소를 선택해주세요.');
+                  return;
+                }
+                setTransportModal(true);
+              }}
               className="w-full px-6 py-4 bg-black hover:bg-gray-800 text-white font-bold text-lg rounded-lg shadow-lg transition-all duration-200 transform hover:scale-[1.02]"
             >
               일정 생성하기
@@ -2201,6 +2400,23 @@ const TripPlanPageEx1 = () => {
                         alert('이동수단을 선택해주세요.');
                         return;
                       }
+                      
+                      // 일정 분배 알고리즘 실행
+                      console.log('🚀 일정 분배 시작...');
+                      console.log('선택된 장소:', selectedPlaces.length);
+                      console.log('선택된 숙소:', selectedAccommodations.length);
+                      
+                      const distributed = distributePlacesToDays(
+                        selectedPlaces,
+                        selectedAccommodations,
+                        startDate,
+                        endDate,
+                        dailyTimeSettings
+                      );
+                      
+                      console.log('✅ 분배 완료:', distributed);
+                      setDistributedSchedule(distributed);
+                      
                       setTransportModal(false);
                       setShowSchedule(true);
                     }}
@@ -2234,9 +2450,12 @@ const TripPlanPageEx1 = () => {
 
     // 필터링된 장소 및 숙소 (선택된 날짜에 따라)
     const getFilteredPlaces = () => {
-      if (selectedDayView === 'all') return selectedPlaces;
-      // 특정 날짜 선택 시 해당 날짜의 장소만 표시 (임시로 전체 표시)
-      return selectedPlaces;
+      if (selectedDayView === 'all') {
+        // 전체 일정: 모든 날짜의 장소를 평면화
+        return distributedSchedule.flat();
+      }
+      // 특정 날짜 선택 시 해당 날짜의 장소만 표시
+      return distributedSchedule[selectedDayView] || [];
     };
 
     const getFilteredAccommodations = () => {
@@ -2340,6 +2559,7 @@ const TripPlanPageEx1 = () => {
                 <div className="flex gap-4 overflow-x-auto pb-4">
                   {Array.from({ length: getTotalDays() }, (_, dayIndex) => {
                     const dayAccommodation = selectedAccommodations.find(acc => acc.dayIndex === dayIndex);
+                    const dayPlaces = distributedSchedule[dayIndex] || [];
                     const date = new Date(startDate);
                     date.setDate(date.getDate() + dayIndex);
                     
@@ -2359,35 +2579,53 @@ const TripPlanPageEx1 = () => {
                         {/* 장소 및 숙소 목록 */}
                         <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
                           {/* 장소 카드들 */}
-                          {selectedPlaces.map((place, placeIndex) => (
-                            <div key={place.id}>
-                              <div className="bg-white rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
-                                <div className="flex gap-3">
-                                  <img
-                                    src={place.image}
-                                    alt={place.name}
-                                    className="w-16 h-16 object-cover rounded flex-shrink-0"
-                                    onError={(e) => {
-                                      if (!e.target.src.startsWith('data:')) {
-                                        e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
-                                      }
-                                    }}
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="font-semibold text-sm text-gray-800 mb-1 truncate">{place.name}</div>
-                                    <div className="text-xs text-gray-500 mb-1">{place.category}</div>
-                                    <div className="flex items-center gap-1 text-xs text-blue-600">
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                      </svg>
-                                      <span>{place.stayHours}시간 {place.stayMinutes}분</span>
+                          {dayPlaces.length === 0 ? (
+                            <div className="text-center text-gray-400 py-8">
+                              <div className="text-sm">배정된 장소가 없습니다</div>
+                            </div>
+                          ) : (
+                            <>
+                              {dayPlaces.map((place, placeIndex) => (
+                                <div key={place.id}>
+                                  <div className="bg-white rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
+                                    <div className="flex gap-3">
+                                      <img
+                                        src={place.image}
+                                        alt={place.name}
+                                        className="w-16 h-16 object-cover rounded flex-shrink-0"
+                                        onError={(e) => {
+                                          if (!e.target.src.startsWith('data:')) {
+                                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                                          }
+                                        }}
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-sm text-gray-800 mb-1 truncate">{place.name}</div>
+                                        <div className="text-xs text-gray-500 mb-1">{place.category}</div>
+                                        <div className="flex items-center gap-1 text-xs text-blue-600">
+                                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          <span>{place.stayHours}시간 {place.stayMinutes}분</span>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
+                                  
+                                  {/* 이동 시간 표시 */}
+                                  {placeIndex < dayPlaces.length - 1 && (
+                                    <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                      </svg>
+                                      <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 15분</span>
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
+                              ))}
                               
-                              {/* 이동 시간 표시 */}
-                              {placeIndex < selectedPlaces.length - 1 && (
+                              {/* 마지막 장소 → 숙소 이동 시간 */}
+                              {dayAccommodation && dayPlaces.length > 0 && (
                                 <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -2395,20 +2633,11 @@ const TripPlanPageEx1 = () => {
                                   <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 15분</span>
                                 </div>
                               )}
-                            </div>
-                          ))}
+                            </>
+                          )}
 
                           {/* 숙소 카드 */}
                           {dayAccommodation && (
-                            <>
-                              {selectedPlaces.length > 0 && (
-                                <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                  </svg>
-                                  <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 15분</span>
-                                </div>
-                              )}
                               <div className="bg-green-50 rounded-lg p-3 border border-green-200">
                                 <div className="flex gap-3">
                                   <img
@@ -2427,18 +2656,23 @@ const TripPlanPageEx1 = () => {
                                   </div>
                                 </div>
                               </div>
-                            </>
                           )}
-      </div>
-    </div>
-  );
+                        </div>
+                      </div>
+                    );
                   })}
                 </div>
               </div>
             ) : (
               // 특정 날짜 일정 표시
               <div className="p-6 space-y-4">
-                {selectedPlaces.map((place, placeIndex) => (
+                {getFilteredPlaces().length === 0 ? (
+                  <div className="text-center text-gray-400 py-12">
+                    <div className="text-lg mb-2">📅</div>
+                    <div>이 날짜에 배정된 장소가 없습니다</div>
+                  </div>
+                ) : (
+                  getFilteredPlaces().map((place, placeIndex) => (
                   <div key={place.id}>
                     <div className="flex gap-4 p-4 bg-white border border-gray-200 rounded-xl hover:shadow-lg transition-shadow">
                       <img
@@ -2464,7 +2698,7 @@ const TripPlanPageEx1 = () => {
                     </div>
 
                     {/* 이동 시간 */}
-                    {placeIndex < selectedPlaces.length - 1 && (
+                    {placeIndex < getFilteredPlaces().length - 1 && (
                       <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
@@ -2473,7 +2707,17 @@ const TripPlanPageEx1 = () => {
                       </div>
                     )}
                   </div>
-                ))}
+                )))}
+
+                {/* 마지막 장소 → 숙소 이동 시간 */}
+                {getFilteredAccommodations().length > 0 && getFilteredPlaces().length > 0 && (
+                  <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                    </svg>
+                    <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 약 15분</span>
+                  </div>
+                )}
 
                 {/* 숙소 */}
                 {getFilteredAccommodations().map(acc => (
@@ -3247,15 +3491,27 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
 
     console.log(`Total markers created (places + accommodations): ${markersRef.current.length}`);
 
-    // 장소들을 순서대로 선으로 연결 (숙소는 제외)
-    if (selectedPlacesList.length > 1) {
+    // 장소들을 순서대로 선으로 연결 + 마지막 장소에서 숙소로 연결
+    if (selectedPlacesList.length > 0) {
       const pathCoordinates = [];
       
+      // 장소들 좌표 추가
       selectedPlacesList.forEach((place) => {
         if (typeof place.lat === 'number' && typeof place.lng === 'number') {
           pathCoordinates.push({ lat: place.lat, lng: place.lng });
         }
       });
+
+      // 마지막 장소 → 숙소 연결 (selectedDayView가 'all'이 아닐 때만)
+      if (selectedDayView !== 'all' && typeof selectedDayView === 'number') {
+        const dayAccommodation = accommodationsList.find(acc => acc.dayIndex === selectedDayView);
+        if (dayAccommodation && dayAccommodation.accommodation.lat && dayAccommodation.accommodation.lng) {
+          pathCoordinates.push({ 
+            lat: dayAccommodation.accommodation.lat, 
+            lng: dayAccommodation.accommodation.lng 
+          });
+        }
+      }
 
       if (pathCoordinates.length > 1) {
         const lineColor = selectedDayView === 'all' ? '#2563eb' : (dayColors[selectedDayView] || '#2563eb');
@@ -3268,7 +3524,7 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
           strokeWeight: 3,
         });
         polylineRef.current.setMap(mapRefInstance.current);
-        console.log('Polyline created connecting', pathCoordinates.length, 'places');
+        console.log('Polyline created connecting', pathCoordinates.length, 'points (including accommodation)');
       }
     }
 
