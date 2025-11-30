@@ -63,39 +63,41 @@ public class TripItineraryItemController {
     }
 
     private void applyReq(TripItineraryItem item, TripItineraryItemDtos.CreateOrUpdateReq req) {
+        item.setPlaceId(req.placeId);
         item.setTitle(req.title);
         item.setDescription(req.description);
         item.setLocationName(req.locationName);
+        item.setAddress(req.address);
         item.setLatitude(req.latitude);
         item.setLongitude(req.longitude);
         item.setStartTime(req.startTime);
         item.setEndTime(req.endTime);
-        item.setEstimatedCost(req.estimatedCost);
         item.setCategory(req.category);
-        item.setTransportationType(req.transportationType);
-        item.setTransportationDuration(req.transportationDuration);
-        item.setTransportationCost(req.transportationCost);
+        item.setStayDurationMinutes(req.stayDurationMinutes);
+        item.setTravelToNextDistanceKm(req.travelToNextDistanceKm);
+        item.setTravelToNextDurationMinutes(req.travelToNextDurationMinutes);
+        item.setTravelToNextMode(req.travelToNextMode);
         item.setOrderSequence(req.orderSequence);
-        item.setConfirmed(req.confirmed);
     }
 
     private TripItineraryItemDtos.Resp toResp(TripItineraryItem item) {
         TripItineraryItemDtos.Resp r = new TripItineraryItemDtos.Resp();
         r.id = item.getId();
+        r.placeId = item.getPlaceId();
         r.title = item.getTitle();
         r.description = item.getDescription();
         r.locationName = item.getLocationName();
+        r.address = item.getAddress();
         r.latitude = item.getLatitude();
         r.longitude = item.getLongitude();
         r.startTime = item.getStartTime();
         r.endTime = item.getEndTime();
-        r.estimatedCost = item.getEstimatedCost();
         r.category = item.getCategory();
-        r.transportationType = item.getTransportationType();
-        r.transportationDuration = item.getTransportationDuration();
-        r.transportationCost = item.getTransportationCost();
+        r.stayDurationMinutes = item.getStayDurationMinutes();
+        r.travelToNextDistanceKm = item.getTravelToNextDistanceKm();
+        r.travelToNextDurationMinutes = item.getTravelToNextDurationMinutes();
+        r.travelToNextMode = item.getTravelToNextMode();
         r.orderSequence = item.getOrderSequence();
-        r.confirmed = item.getConfirmed();
         return r;
     }
 }

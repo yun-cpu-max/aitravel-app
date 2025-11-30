@@ -62,7 +62,7 @@ const Navbar = ({ onOpenModal }) => {
             <Link to="/" className="flex-shrink-0 flex items-center space-x-3 hover:opacity-80 transition-opacity">
               <img src="/logo.png" alt="스마트 여행 플래너" className="w-10 h-10 rounded-md" />
               <h1 className="text-2xl font-bold text-sky-400">
-                스마트 여행 플래너
+                여행 플래너
               </h1>
             </Link>
           </div>

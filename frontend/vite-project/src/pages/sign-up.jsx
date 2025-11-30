@@ -84,7 +84,7 @@ const SignUpPage = () => {
               <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-md" />
               <span className="text-3xl font-extrabold tracking-tight text-gray-800">회원가입</span>
             </div>
-            <div className="text-sm text-gray-500">AI 여행 스케줄링 플래너</div>
+            <div className="text-sm text-gray-500">여행 스케줄링 플래너</div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">

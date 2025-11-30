@@ -2,6 +2,7 @@ package com.example.demo.repository;
 
 import com.example.demo.domain.Trip;
 import com.example.demo.domain.User;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -23,6 +24,14 @@ public interface TripRepository extends JpaRepository<Trip, Long> {
      * @return 해당 사용자의 여행 목록 (없으면 빈 리스트)
      */
     List<Trip> findByUser(User user);
+    
+    /**
+     * 모든 여행 목록 조회 (TripDays와 ItineraryItems 포함)
+     * - @EntityGraph: LAZY 로딩 관계를 함께 조회
+     */
+    @EntityGraph(attributePaths = {"tripDays", "tripDays.itineraryItems", "user"})
+    @Override
+    List<Trip> findAll();
 }
 
 

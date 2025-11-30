@@ -52,10 +52,10 @@ const HeroSection = () => {
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-gray-900 leading-tight">
               당신의 완벽한 여행,
               <br />
-              AI가 도와줍니다.
+              편리하게 계획하세요.
             </h1>
             <p className="text-base sm:text-lg md:text-xl text-gray-600 leading-relaxed">
-              개인 맞춤형 여행 일정을 AI가 자동으로 생성해드립니다. 더 이상 복잡한 계획에 시간을 낭비하지 마세요.
+              개인 맞춤형 여행 일정을 자동으로 생성해드립니다. 더 이상 복잡한 계획에 시간을 낭비하지 마세요.
             </p>
             {/* CTA 버튼: 마이로처럼 적당한 크기 */}
             <div className="pt-2">
@@ -63,7 +63,7 @@ const HeroSection = () => {
                 onClick={handleStartPlan}
                 className="inline-flex items-center justify-center h-12 sm:h-14 px-6 sm:px-8 bg-black hover:bg-gray-900 text-white text-base sm:text-lg font-semibold rounded-lg shadow-lg transition-all duration-300 hover:scale-105"
               >
-                AI로 여행 시작하기
+                여행 계획하기
               </button>
             </div>
           </div>

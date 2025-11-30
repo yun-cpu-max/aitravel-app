@@ -58,18 +58,10 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/users/**").permitAll()
-                .requestMatchers("/api/trips/**").permitAll()
-                .requestMatchers("/api/places/**").permitAll()
-                .requestMatchers("/api/trip-days/**").permitAll()
-                .requestMatchers("/api/trip-itinerary-items/**").permitAll()
-                .requestMatchers("/api/transportation-info/**").permitAll()
-                .requestMatchers("/api/chat-conversations/**").permitAll()
-                .requestMatchers("/api/trip-feedback/**").permitAll()
-                .requestMatchers("/api/user-preferences/**").permitAll()
-                .anyRequest().authenticated()
+                .anyRequest().permitAll()  // 임시: 모든 요청 허용 (디버깅용)
             );
+        
+        System.out.println("✅ SecurityConfig 로드됨: 모든 API 허용 (디버깅 모드)");
         
         return http.build();
     }

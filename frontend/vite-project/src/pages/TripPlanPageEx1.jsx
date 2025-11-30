@@ -5,6 +5,8 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 // 환경 변수에서 API 키를 사용합니다 (Vite: import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
 
@@ -42,6 +44,9 @@ const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 // (정적지도 사용으로 JS 로더는 미사용)
 
 const TripPlanPageEx1 = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
   // 0: 공통 입력, 1: 모드 선택, 2: 분기 본문(직접/AI), 3: 편집/확인
   const [step, setStep] = useState(0);
   const [mode, setMode] = useState('direct'); // 'direct' | 'ai'
@@ -985,11 +990,11 @@ const TripPlanPageEx1 = () => {
                     </div>
 
           {/* 오른쪽: 선택된 장소 영역 (슬라이드 가능) */}
-          <div className={`transition-all duration-300 ease-in-out ${selectedPanelOpen ? 'w-[350px]' : 'w-0'} bg-white shadow-2xl overflow-hidden flex flex-col h-full border-l border-gray-200`}>
+          <div className={`transition-all duration-300 ease-in-out ${selectedPanelOpen ? 'w-[350px]' : 'w-0'} bg-white shadow-2xl overflow-hidden flex flex-col h-full`}>
             {selectedPanelOpen && (
               <>
                 {/* 헤더 */}
-                <div className="p-4 pb-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                <div className="p-4 pb-3 flex items-center justify-between flex-shrink-0">
                   <div className="flex items-baseline gap-2">
                     <div className="text-2xl font-bold text-gray-800">
                       {selectedPlaces.length}
@@ -1540,11 +1545,11 @@ const TripPlanPageEx1 = () => {
           </div>
 
           {/* 오른쪽: 선택된 숙소 영역 (슬라이드 가능) */}
-          <div className={`transition-all duration-300 ease-in-out ${selectedPanelOpen ? 'w-[350px]' : 'w-0'} bg-white shadow-2xl overflow-hidden flex flex-col h-full border-l border-gray-200`}>
+          <div className={`transition-all duration-300 ease-in-out ${selectedPanelOpen ? 'w-[350px]' : 'w-0'} bg-white shadow-2xl overflow-hidden flex flex-col h-full`}>
             {selectedPanelOpen && (
               <>
                 {/* 헤더 */}
-                <div className="p-4 pb-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                <div className="p-4 pb-3 flex items-center justify-between flex-shrink-0">
                   <div className="flex items-baseline gap-2">
                     <div className="text-2xl font-bold text-gray-800">
                       {selectedAccommodations.length}
@@ -1927,11 +1932,79 @@ const TripPlanPageEx1 = () => {
     );
   };
 
+  // Haversine 공식으로 직선 거리 계산 (Fallback용)
+  const calculateHaversineDistance = (loc1, loc2) => {
+    if (!loc1 || !loc2 || !loc1.lat || !loc1.lng || !loc2.lat || !loc2.lng) return 10;
+    const R = 6371; // 지구 반지름 (km)
+    const dLat = (loc2.lat - loc1.lat) * Math.PI / 180;
+    const dLng = (loc2.lng - loc1.lng) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(loc1.lat * Math.PI / 180) * Math.cos(loc2.lat * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  };
+
+  // Routes API를 사용한 거리 및 이동 시간 계산 (최신 API)
+  const calculateDistanceAndTime = async (origin, destination, mode = 'transit') => {
+    try {
+      // 이동 수단 변환: 'transit' → 'TRANSIT', 'driving' → 'DRIVE'
+      const travelMode = mode === 'transit' ? 'TRANSIT' : 
+                        mode === 'driving' ? 'DRIVE' : 
+                        'TRANSIT';
+      
+      const response = await fetch(
+        `http://localhost:8081/api/routes/compute?` +
+        `originLat=${origin.lat}&originLng=${origin.lng}&` +
+        `destLat=${destination.lat}&destLng=${destination.lng}&` +
+        `travelMode=${travelMode}`
+      );
+      
+      // HTTP 상태 코드 확인 (200-299가 아니면 Fallback)
+      if (!response.ok) {
+        console.warn(`⚠️ Routes API 응답 실패 (${response.status}): Fallback 사용`);
+        const distance = calculateHaversineDistance(origin, destination);
+        return {
+          distance,
+          duration: Math.round(distance / 30 * 60),
+          fallback: true,
+          trafficAware: false
+        };
+      }
+      
+      const data = await response.json();
+      
+      // 디버그: 교통 정보 반영 여부 로그
+      if (data.trafficAware && !data.fallback) {
+        console.log(`✅ 실시간 교통 반영: ${origin.lat.toFixed(3)} → ${destination.lat.toFixed(3)} (${data.duration}분)`);
+      } else if (data.fallback) {
+        console.log(`⚠️ Fallback 사용: ${origin.lat.toFixed(3)} → ${destination.lat.toFixed(3)} (${data.duration}분)`);
+      }
+      
+      return {
+        distance: data.distance || 0,
+        duration: data.duration || 0,
+        fallback: data.fallback || false,
+        trafficAware: data.trafficAware || false
+      };
+    } catch (error) {
+      console.error('Routes API 오류:', error);
+      // Fallback: 직선 거리 계산
+      const distance = calculateHaversineDistance(origin, destination);
+      return {
+        distance,
+        duration: Math.round(distance / 30 * 60), // 평균 30km/h로 추정
+        polyline: '',
+        fallback: true,
+        trafficAware: false
+      };
+    }
+  };
+
   // 일정 분배 알고리즘
   const distributePlacesToDays = (places, accommodations, startDate, endDate, dailyTimeSettings) => {
     const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
     
-    // 거리 계산 (Haversine)
+    // 거리 계산 (Haversine) - Fallback용
     const getDist = (loc1, loc2) => {
       if (!loc1 || !loc2 || !loc1.lat || !loc1.lng || !loc2.lat || !loc2.lng) return 99999;
       const R = 6371;
@@ -1973,20 +2046,32 @@ const TripPlanPageEx1 = () => {
       });
     }
 
-    // --- [Step 2] 클러스터링: 각 장소를 가장 가까운 날짜에 가배정 ---
+    // --- [Step 2] 클러스터링: 각 장소를 가장 가까운 날짜에 가배정 (균등 분배 고려) ---
+    const dayCounts = Array(totalDays).fill(0); // 각 날짜별 배정된 장소 수 추적
+    
     const clusteredPlaces = places.map(place => {
       let bestDay = 0;
-      let minDistance = 99999;
+      let bestScore = -Infinity;
 
       dayInfo.forEach((info, index) => {
         if (info.location) {
           const dist = getDist(info.location, place);
-          if (dist < minDistance) {
-            minDistance = dist;
+          
+          // 점수 계산: 거리가 가까울수록 + 장소가 적을수록 높은 점수
+          // - 거리: km당 -10점
+          // - 균등 분배: 이미 배정된 장소 1개당 -50점 (균등 분배 우선)
+          const distanceScore = -dist * 10;
+          const balanceScore = -dayCounts[index] * 50;
+          const totalScore = distanceScore + balanceScore;
+          
+          if (totalScore > bestScore) {
+            bestScore = totalScore;
             bestDay = index;
           }
         }
       });
+      
+      dayCounts[bestDay]++; // 배정된 날짜의 카운트 증가
       
       return { ...place, assignedDay: bestDay };
     });
@@ -2118,6 +2203,254 @@ const TripPlanPageEx1 = () => {
 
   // 분배된 일정 저장 상태
   const [distributedSchedule, setDistributedSchedule] = useState([]);
+  
+  // 이동 시간 정보 저장 (장소 간 이동 시간 캐싱)
+  const [travelTimes, setTravelTimes] = useState({});
+  
+  // 저장 중 상태
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // 여행 계획 저장 함수
+  const handleSaveTrip = async () => {
+    if (!user || !user.id) {
+      alert('로그인이 필요합니다.');
+      navigate('/login');
+      return;
+    }
+    
+    if (!selectedDestination.name || !startDate || !endDate) {
+      alert('여행지와 날짜를 선택해주세요.');
+      return;
+    }
+    
+    if (distributedSchedule.length === 0) {
+      alert('일정을 생성해주세요.');
+      return;
+    }
+    
+    setIsSaving(true);
+    
+    try {
+      // 날짜를 YYYY-MM-DD 형식으로 변환
+      const formatDate = (date) => {
+        if (!date) return null;
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      // 시간 문자열을 LocalTime 형식으로 변환 (HH:mm)
+      const formatTime = (timeStr) => {
+        if (!timeStr) return null;
+        return timeStr; // "10:00" 형식 그대로 사용
+      };
+      
+      // 일차별 데이터 변환
+      const days = distributedSchedule.map((dayPlaces, dayIndex) => {
+        const date = new Date(startDate);
+        date.setDate(date.getDate() + dayIndex);
+        const dateKey = formatDate(date);
+        const timeSettings = dailyTimeSettings[dateKey] || { startTime: '10:00', endTime: '22:00' };
+        const accommodation = selectedAccommodations.find(acc => acc.dayIndex === dayIndex);
+        
+        // 일정 항목 변환
+        const itineraryItems = dayPlaces.map((place, placeIndex) => {
+          const nextPlace = dayPlaces[placeIndex + 1];
+          const transportMode = selectedTransport || 'car';
+          const travelKey = nextPlace 
+            ? `${place.lat},${place.lng}-${nextPlace.lat},${nextPlace.lng}-${transportMode === 'public' ? 'transit' : 'driving'}`
+            : null;
+          const travelTime = travelKey ? travelTimes[travelKey] : null;
+          
+          return {
+            title: place.name,
+            placeId: place.id || place.placeId || null,
+            description: place.description || null,
+            locationName: place.name,
+            address: place.address || null,
+            latitude: place.lat || null,
+            longitude: place.lng || null,
+            startTime: null, // 필요시 계산
+            endTime: null, // 필요시 계산
+            category: place.category || null,
+            stayDurationMinutes: (place.stayHours || 0) * 60 + (place.stayMinutes || 0),
+            travelToNextDistanceKm: null, // 필요시 계산
+            travelToNextDurationMinutes: travelTime || null,
+            travelToNextMode: transportMode === 'public' ? 'TRANSIT' : 'DRIVE',
+            orderSequence: placeIndex + 1
+          };
+        });
+        
+        return {
+          dayNumber: dayIndex + 1,
+          date: formatDate(date),
+          dayStartTime: formatTime(timeSettings.startTime),
+          dayEndTime: formatTime(timeSettings.endTime),
+          accommodationJson: accommodation ? JSON.stringify({
+            name: accommodation.accommodation.name,
+            placeId: accommodation.accommodation.placeId,
+            lat: accommodation.accommodation.lat,
+            lng: accommodation.accommodation.lng,
+            address: accommodation.accommodation.address
+          }) : null,
+          itineraryItems: itineraryItems
+        };
+      });
+      
+      // 여행 데이터 생성
+      const tripData = {
+        title: `${selectedDestination.name} 여행`,
+        destination: selectedDestination.name,
+        destinationPlaceId: selectedDestination.placeId || null,
+        destinationLat: selectedDestination.lat || null,
+        destinationLng: selectedDestination.lng || null,
+        startDate: formatDate(startDate),
+        endDate: formatDate(endDate),
+        numAdults: 1,
+        numChildren: 0,
+        totalBudget: null,
+        days: days
+      };
+      
+      // API 호출
+      const response = await fetch(`http://localhost:8081/api/trips/user/${user.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tripData)
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`저장 실패: ${errorText}`);
+      }
+      
+      const savedTrip = await response.json();
+      console.log('여행 계획 저장 완료:', savedTrip);
+      
+      // 대시보드로 이동
+      navigate('/dashboard');
+      
+    } catch (error) {
+      console.error('여행 계획 저장 오류:', error);
+      alert('저장 중 오류가 발생했습니다: ' + error.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // 편집 패널 표시 상태
+  const [showEditPanel, setShowEditPanel] = useState(false);
+  
+  // 장소 이동 모드 상태
+  const [movingItem, setMovingItem] = useState(null); // { dayIndex, placeIndex }
+  
+  // 두 지점 간 이동 시간 가져오기 (캐시 활용)
+  const getTravelTime = async (from, to, mode = 'transit') => {
+    if (!from || !to) return 15; // 기본값
+    
+    const key = `${from.lat},${from.lng}-${to.lat},${to.lng}-${mode}`;
+    
+    // 캐시에 있으면 반환
+    if (travelTimes[key]) {
+      return travelTimes[key];
+    }
+    
+    // API 호출
+    try {
+      const result = await calculateDistanceAndTime(from, to, mode);
+      const duration = result.duration || 15;
+      
+      // 캐시에 저장
+      setTravelTimes(prev => ({ ...prev, [key]: duration }));
+      
+      return duration;
+    } catch (error) {
+      console.error('이동 시간 계산 오류:', error);
+      return 15; // 기본값
+    }
+  };
+  
+  // 일정 변경 시 이동 시간 재계산
+  const recalculateTravelTimes = async (schedule) => {
+    const newTravelTimes = { ...travelTimes };
+    const mode = selectedTransport === 'public' ? 'transit' : 'driving';
+    
+    for (let dayIndex = 0; dayIndex < schedule.length; dayIndex++) {
+      const dayPlaces = schedule[dayIndex] || [];
+      
+      // 장소 간 이동 시간 계산
+      for (let i = 0; i < dayPlaces.length - 1; i++) {
+        const from = { lat: dayPlaces[i].lat, lng: dayPlaces[i].lng };
+        const to = { lat: dayPlaces[i + 1].lat, lng: dayPlaces[i + 1].lng };
+        const key = `${from.lat},${from.lng}-${to.lat},${to.lng}-${mode}`;
+        
+        if (!newTravelTimes[key]) {
+          try {
+            const result = await calculateDistanceAndTime(from, to, mode);
+            newTravelTimes[key] = result.duration || 15;
+          } catch (error) {
+            console.error('이동 시간 계산 오류:', error);
+            newTravelTimes[key] = 15;
+          }
+        }
+      }
+      
+      // 마지막 장소 → 숙소 이동 시간 계산
+      if (dayPlaces.length > 0) {
+        const dayAccommodation = selectedAccommodations.find(acc => acc.dayIndex === dayIndex);
+        if (dayAccommodation && dayAccommodation.accommodation.lat && dayAccommodation.accommodation.lng) {
+          const from = { lat: dayPlaces[dayPlaces.length - 1].lat, lng: dayPlaces[dayPlaces.length - 1].lng };
+          const to = { lat: dayAccommodation.accommodation.lat, lng: dayAccommodation.accommodation.lng };
+          const key = `${from.lat},${from.lng}-${to.lat},${to.lng}-${mode}`;
+          
+          if (!newTravelTimes[key]) {
+            try {
+              const result = await calculateDistanceAndTime(from, to, mode);
+              newTravelTimes[key] = result.duration || 15;
+            } catch (error) {
+              console.error('이동 시간 계산 오류:', error);
+              newTravelTimes[key] = 15;
+            }
+          }
+        }
+      }
+    }
+    
+    setTravelTimes(newTravelTimes);
+  };
+
+  // 이동 시간 표시 컴포넌트
+  const TravelTimeDisplay = ({ from, to, mode }) => {
+    const [duration, setDuration] = useState(null);
+    const [loading, setLoading] = useState(true);
+    
+    // 좌표 문자열로 메모이제이션 (불필요한 재계산 방지)
+    const fromKey = useMemo(() => from ? `${from.lat},${from.lng}` : '', [from]);
+    const toKey = useMemo(() => to ? `${to.lat},${to.lng}` : '', [to]);
+    
+    useEffect(() => {
+      const fetchDuration = async () => {
+        if (!from || !to) return;
+        setLoading(true);
+        const time = await getTravelTime(from, to, mode);
+        setDuration(time);
+        setLoading(false);
+      };
+      
+      fetchDuration();
+    }, [fromKey, toKey, mode, from, to]);
+    
+    if (loading || duration === null) {
+      return <span>계산중...</span>;
+    }
+    
+    const modeText = mode === 'transit' ? '대중교통' : mode === 'driving' ? '자동차' : '이동';
+    return <span>{modeText} 약 {duration}분</span>;
+  };
 
   // 일정 생성 모드 (step 4)
   const ScheduleGenerationMode = () => {
@@ -2510,23 +2843,65 @@ const TripPlanPageEx1 = () => {
         </div>
 
           {/* 일정편집 버튼 (하단) */}
-          <div className="px-3 mt-2 pt-3 border-t border-gray-200">
+          <div className="px-3 mt-2 pt-3 border-t border-gray-200 space-y-2">
             <button
               onClick={() => {
-                setShowSchedule(false);
-                setSelectedDayView('all');
+                setShowEditPanel(!showEditPanel);
               }}
-              className="w-full py-3 rounded-lg hover:bg-gray-100 transition-colors"
+              className={`w-full py-3 rounded-lg transition-colors ${
+                showEditPanel ? 'bg-blue-500 text-white' : 'hover:bg-gray-100 text-gray-500'
+              }`}
             >
-              <svg className="w-5 h-5 mx-auto text-gray-500 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              <div className="text-xs font-medium text-gray-500">편집</div>
+              <div className="text-xs font-medium">편집</div>
+            </button>
+            <button
+              onClick={handleSaveTrip}
+              disabled={isSaving}
+              className={`w-full py-3 rounded-lg transition-colors ${
+                isSaving 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              {isSaving ? (
+                <>
+                  <svg className="w-5 h-5 mx-auto mb-1 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  <div className="text-xs font-medium">저장 중...</div>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div className="text-xs font-medium">완성</div>
+                </>
+              )}
             </button>
         </div>
       </div>
 
-        {/* 중앙 일정 상세 패널 */}
+        {/* 중앙 패널 (편집 패널 또는 일정 상세 패널) */}
+        {showEditPanel ? (
+          <EditPanel 
+            distributedSchedule={distributedSchedule}
+            setDistributedSchedule={setDistributedSchedule}
+            selectedDayView={selectedDayView}
+            startDate={startDate}
+            selectedTransport={selectedTransport}
+            recalculateTravelTimes={recalculateTravelTimes}
+            movingItem={movingItem}
+            setMovingItem={setMovingItem}
+            formatDateWithWeekday={formatDateWithWeekday}
+            getTotalDays={getTotalDays}
+            setShowEditPanel={setShowEditPanel}
+            TravelTimeDisplay={TravelTimeDisplay}
+          />
+        ) : (
         <div className="absolute left-[100px] top-0 bottom-0 w-[850px] bg-white shadow-2xl flex flex-col z-10">
           {/* 헤더 */}
           <div className="p-6 border-b border-gray-200 flex-shrink-0">
@@ -2613,26 +2988,40 @@ const TripPlanPageEx1 = () => {
                                   </div>
                                   
                                   {/* 이동 시간 표시 */}
-                                  {placeIndex < dayPlaces.length - 1 && (
-                                    <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                      </svg>
-                                      <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 15분</span>
-                                    </div>
-                                  )}
+                                  {placeIndex < dayPlaces.length - 1 && (() => {
+                                    const nextPlace = dayPlaces[placeIndex + 1];
+                                    return (
+                                      <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                        </svg>
+                                        <TravelTimeDisplay 
+                                          from={{ lat: place.lat, lng: place.lng }}
+                                          to={{ lat: nextPlace.lat, lng: nextPlace.lng }}
+                                          mode={selectedTransport === 'public' ? 'transit' : 'driving'}
+                                        />
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ))}
                               
                               {/* 마지막 장소 → 숙소 이동 시간 */}
-                              {dayAccommodation && dayPlaces.length > 0 && (
-                                <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                                  </svg>
-                                  <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 15분</span>
-                                </div>
-                              )}
+                              {dayAccommodation && dayPlaces.length > 0 && (() => {
+                                const lastPlace = dayPlaces[dayPlaces.length - 1];
+                                return (
+                                  <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                    </svg>
+                                    <TravelTimeDisplay 
+                                      from={{ lat: lastPlace.lat, lng: lastPlace.lng }}
+                                      to={{ lat: dayAccommodation.accommodation.lat, lng: dayAccommodation.accommodation.lng }}
+                                      mode={selectedTransport === 'public' ? 'transit' : 'driving'}
+                                    />
+                                  </div>
+                                );
+                              })()}
                             </>
                           )}
 
@@ -2657,9 +3046,9 @@ const TripPlanPageEx1 = () => {
                                 </div>
                               </div>
                           )}
-                        </div>
-                      </div>
-                    );
+      </div>
+    </div>
+  );
                   })}
                 </div>
               </div>
@@ -2698,26 +3087,42 @@ const TripPlanPageEx1 = () => {
                     </div>
 
                     {/* 이동 시간 */}
-                    {placeIndex < getFilteredPlaces().length - 1 && (
-                      <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                        </svg>
-                        <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 약 15분</span>
-                      </div>
-                    )}
+                    {placeIndex < getFilteredPlaces().length - 1 && (() => {
+                      const nextPlace = getFilteredPlaces()[placeIndex + 1];
+                      return (
+                        <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                          </svg>
+                          <TravelTimeDisplay 
+                            from={{ lat: place.lat, lng: place.lng }}
+                            to={{ lat: nextPlace.lat, lng: nextPlace.lng }}
+                            mode={selectedTransport === 'public' ? 'transit' : 'driving'}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 )))}
 
                 {/* 마지막 장소 → 숙소 이동 시간 */}
-                {getFilteredAccommodations().length > 0 && getFilteredPlaces().length > 0 && (
-                  <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                    <span>{selectedTransport === 'public' ? '대중교통' : '자동차'} 약 15분</span>
-                  </div>
-                )}
+                {getFilteredAccommodations().length > 0 && getFilteredPlaces().length > 0 && (() => {
+                  const places = getFilteredPlaces();
+                  const lastPlace = places[places.length - 1];
+                  const accommodation = getFilteredAccommodations()[0];
+                  return (
+                    <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                      <TravelTimeDisplay 
+                        from={{ lat: lastPlace.lat, lng: lastPlace.lng }}
+                        to={{ lat: accommodation.accommodation.lat, lng: accommodation.accommodation.lng }}
+                        mode={selectedTransport === 'public' ? 'transit' : 'driving'}
+                      />
+                    </div>
+                  );
+                })()}
 
                 {/* 숙소 */}
                 {getFilteredAccommodations().map(acc => (
@@ -2741,6 +3146,347 @@ const TripPlanPageEx1 = () => {
               </div>
             )}
           </div>
+        </div>
+        )}
+      </div>
+    );
+  };
+
+  // 편집 패널 컴포넌트
+  const EditPanel = ({
+    distributedSchedule,
+    setDistributedSchedule,
+    selectedDayView,
+    startDate,
+    selectedTransport,
+    recalculateTravelTimes,
+    movingItem,
+    setMovingItem,
+    formatDateWithWeekday,
+    getTotalDays,
+    setShowEditPanel,
+    TravelTimeDisplay
+  }) => {
+
+    // 장소 삭제
+    const handleDeletePlace = async (dayIndex, placeIndex) => {
+      const newSchedule = [...distributedSchedule];
+      if (newSchedule[dayIndex]) {
+        newSchedule[dayIndex] = newSchedule[dayIndex].filter((_, idx) => idx !== placeIndex);
+        setDistributedSchedule(newSchedule);
+        
+        // 이동 시간 재계산
+        await recalculateTravelTimes(newSchedule);
+      }
+    };
+
+    // 이동 모드 시작
+    const handleStartMove = (dayIndex, placeIndex) => {
+      setMovingItem({ dayIndex, placeIndex });
+    };
+
+    // 이동 모드 취소
+    const handleCancelMove = () => {
+      setMovingItem(null);
+    };
+
+    // 장소 교환
+    const handleSwapPlaces = async (targetDayIndex, targetPlaceIndex) => {
+      if (!movingItem) return;
+      
+      const { dayIndex: sourceDayIndex, placeIndex: sourcePlaceIndex } = movingItem;
+      const newSchedule = [...distributedSchedule];
+      
+      // 같은 장소면 교환 불필요
+      if (sourceDayIndex === targetDayIndex && sourcePlaceIndex === targetPlaceIndex) {
+        setMovingItem(null);
+        return;
+      }
+      
+      // 출발지와 목적지 장소 가져오기
+      const sourcePlaces = [...newSchedule[sourceDayIndex]];
+      const targetPlaces = newSchedule[targetDayIndex] ? [...newSchedule[targetDayIndex]] : [];
+      
+      const sourcePlace = sourcePlaces[sourcePlaceIndex];
+      
+      // 같은 일차 내에서 교환
+      if (sourceDayIndex === targetDayIndex) {
+        const temp = targetPlaces[targetPlaceIndex];
+        targetPlaces[targetPlaceIndex] = sourcePlace;
+        targetPlaces[sourcePlaceIndex] = temp;
+        newSchedule[sourceDayIndex] = targetPlaces;
+      } else {
+        // 다른 일차로 교환
+        const targetPlace = targetPlaces[targetPlaceIndex];
+        sourcePlaces[sourcePlaceIndex] = targetPlace;
+        targetPlaces[targetPlaceIndex] = sourcePlace;
+        newSchedule[sourceDayIndex] = sourcePlaces;
+        newSchedule[targetDayIndex] = targetPlaces;
+      }
+      
+      setDistributedSchedule(newSchedule);
+      setMovingItem(null);
+      
+      // 이동 시간 재계산
+      await recalculateTravelTimes(newSchedule);
+    };
+
+    const getCurrentDayPlaces = () => {
+      if (selectedDayView === 'all') {
+        return distributedSchedule.flat();
+      }
+      return distributedSchedule[selectedDayView] || [];
+    };
+
+    const currentDayPlaces = getCurrentDayPlaces();
+    const mode = selectedTransport === 'public' ? 'transit' : 'driving';
+
+    return (
+      <div className="absolute left-[100px] top-0 bottom-0 w-[850px] bg-white shadow-2xl flex flex-col z-10">
+        {/* 헤더 */}
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-2xl font-bold text-gray-800">일정 편집</h2>
+            <div className="flex items-center gap-3">
+              {movingItem && (
+                <button
+                  onClick={handleCancelMove}
+                  className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg"
+                >
+                  이동 취소
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setShowEditPanel(false);
+                  setMovingItem(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          {movingItem && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                이동할 장소를 선택하세요. 선택한 장소와 교환됩니다.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 일정 목록 */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {selectedDayView === 'all' ? (
+            // 전체 일정 표시
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {Array.from({ length: getTotalDays() }, (_, dayIndex) => {
+                const dayPlaces = distributedSchedule[dayIndex] || [];
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + dayIndex);
+                
+                return (
+                  <div key={dayIndex} className="flex-shrink-0 w-[380px] bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-300">
+                      <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-base font-bold">
+                        {dayIndex + 1}
+                      </div>
+                      <div>
+                        <div className="text-base font-bold text-gray-800">{dayIndex + 1}일차</div>
+                        <div className="text-sm text-gray-500">{formatDateWithWeekday(date)}</div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 min-h-[200px]">
+                      {dayPlaces.length === 0 ? (
+                        <div className="text-center text-gray-400 py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                          <div className="text-sm">장소가 없습니다</div>
+                        </div>
+                      ) : (
+                        dayPlaces.map((place, placeIndex) => (
+                          <div key={`${place.id}-${placeIndex}`}>
+                            <div
+                              onClick={() => {
+                                if (movingItem) {
+                                  handleSwapPlaces(dayIndex, placeIndex);
+                                }
+                              }}
+                              className={`bg-white rounded-lg p-3 border-2 transition-all ${
+                                movingItem?.dayIndex === dayIndex && movingItem?.placeIndex === placeIndex
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : movingItem
+                                  ? 'cursor-pointer border-gray-200 hover:border-green-500 hover:bg-green-50'
+                                  : 'border-gray-200 hover:shadow-md'
+                              }`}
+                            >
+                              <div className="flex gap-3">
+                                {!movingItem && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartMove(dayIndex, placeIndex);
+                                    }}
+                                    className="text-blue-500 hover:text-blue-700 flex-shrink-0"
+                                    title="장소 이동"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                    </svg>
+                                  </button>
+                                )}
+                                <img
+                                  src={place.image}
+                                  alt={place.name}
+                                  className="w-16 h-16 object-cover rounded flex-shrink-0"
+                                  onError={(e) => {
+                                    if (!e.target.src.startsWith('data:')) {
+                                      e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                                    }
+                                  }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-sm text-gray-800 mb-1 truncate">{place.name}</div>
+                                  <div className="text-xs text-gray-500 mb-1">{place.category}</div>
+                                  <div className="flex items-center gap-1 text-xs text-blue-600">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>{place.stayHours || 0}시간 {place.stayMinutes || 0}분</span>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeletePlace(dayIndex, placeIndex);
+                                  }}
+                                  className="text-red-500 hover:text-red-700 flex-shrink-0"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* 이동 시간 표시 */}
+                            {placeIndex < dayPlaces.length - 1 && (
+                              <div className="flex items-center justify-center gap-1 py-2 text-xs text-gray-500">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                                </svg>
+                                {TravelTimeDisplay && (
+                                  <TravelTimeDisplay 
+                                    from={{ lat: place.lat, lng: place.lng }}
+                                    to={{ lat: dayPlaces[placeIndex + 1].lat, lng: dayPlaces[placeIndex + 1].lng }}
+                                    mode={mode}
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            // 특정 날짜 일정 표시
+            <div className="space-y-4 min-h-[200px]">
+              {currentDayPlaces.length === 0 ? (
+                <div className="text-center text-gray-400 py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                  <div className="text-lg mb-2">📅</div>
+                  <div>장소가 없습니다</div>
+                </div>
+              ) : (
+                currentDayPlaces.map((place, placeIndex) => (
+                  <div key={`${place.id}-${placeIndex}`}>
+                    <div
+                      onClick={() => {
+                        if (movingItem) {
+                          handleSwapPlaces(selectedDayView, placeIndex);
+                        }
+                      }}
+                      className={`flex gap-4 p-4 bg-white border-2 rounded-xl transition-all ${
+                        movingItem?.dayIndex === selectedDayView && movingItem?.placeIndex === placeIndex
+                          ? 'border-blue-500 bg-blue-50'
+                          : movingItem
+                          ? 'cursor-pointer border-gray-200 hover:border-green-500 hover:bg-green-50'
+                          : 'border-gray-200 hover:shadow-lg'
+                      }`}
+                    >
+                      {!movingItem && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartMove(selectedDayView, placeIndex);
+                          }}
+                          className="text-blue-500 hover:text-blue-700 flex-shrink-0"
+                          title="장소 이동"
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                        </button>
+                      )}
+                      <img
+                        src={place.image}
+                        alt={place.name}
+                        className="w-24 h-24 object-cover rounded-lg flex-shrink-0"
+                        onError={(e) => {
+                          if (!e.target.src.startsWith('data:')) {
+                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjZTVlN2ViIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5Yzk5YzMiIGR5PSIuM2VtIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
+                          }
+                        }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold text-base text-gray-800 mb-2">{place.name}</div>
+                        <div className="text-sm text-gray-600 mb-2">{place.category}</div>
+                        <div className="flex items-center gap-1 text-sm text-blue-600">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>체류시간: {place.stayHours || 0}시간 {place.stayMinutes || 0}분</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePlace(selectedDayView, placeIndex);
+                        }}
+                        className="text-red-500 hover:text-red-700 flex-shrink-0"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    {/* 이동 시간 */}
+                    {placeIndex < currentDayPlaces.length - 1 && (
+                      <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                        </svg>
+                        {TravelTimeDisplay && (
+                          <TravelTimeDisplay 
+                            from={{ lat: place.lat, lng: place.lng }}
+                            to={{ lat: currentDayPlaces[placeIndex + 1].lat, lng: currentDayPlaces[placeIndex + 1].lng }}
+                            mode={mode}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
     );

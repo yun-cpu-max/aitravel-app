@@ -25,33 +25,29 @@ const FeatureSection = () => {
    */
   const features = [
     {
-      title: 'AI 맞춤형 일정 생성',
-      description: '도시, 날씨, 취향만 알려주세요. AI가 최적의 여행 계획을 만들어드립니다.',
+      title: '여행지 검색',
+      description: '원하는 여행지를 검색하고 인기 여행지를 추천받으세요.',
     },
     {
-      title: '실시간 경로 최적화',
-      description: '교통 상황 및 혼잡도를 고려한 최적 경로를 제시합니다.',
+      title: '장소 찾기',
+      description: '관광지, 레스토랑, 카페 등 다양한 장소를 검색하고 일정에 추가하세요.',
+    },
+    {
+      title: '숙소 검색',
+      description: '여행 기간에 맞는 숙소를 찾아 일정에 포함시킬 수 있습니다.',
+    },
+    {
+      title: '교통수단 안내',
+      description: '대중교통과 택시를 이용한 이동 시간과 경로를 확인하세요.',
+    },
+    {
+      title: '일정 자동 생성',
+      description: '선택한 장소와 숙소를 바탕으로 최적의 일정을 자동으로 생성합니다.',
     },
     {
       title: '여행 대시보드',
-      description: '이전 여행,  계획중인 여행, 최근 활동을 한 화면에서 확인하세요.',
+      description: '생성된 여행 일정을 한눈에 확인하고 관리할 수 있습니다.',
     },
-    // {
-    //   title: '예산 맞춤 계획',
-    //   description: '설정한 예산에 맞춰 최고의 가성비 여행을 계획합니다.',
-    // },
-    {
-      title: '개인 취향 분석',
-      description: '과거 여행 기록을 분석해 다음 여행에 반영합니다.',
-    },
-    {
-      title: '통합 예약 지원',
-      description: '항공권, 숙소, 교통 수단을 한 번에 예약하고 관리하세요.',
-    },
-    // {
-    //   title: '실시간 경비 추적기',
-    //   description: '여행 중 지출을 실시간으로 기록하고 예산을 관리할 수 있습니다.',
-    // },
   ];
 
   /**
@@ -77,7 +73,7 @@ const FeatureSection = () => {
           주요 기능
         </h2>
         <p className="text-gray-600 mb-12">
-          AI 기술로 구현된 혁신적인 여행 계획 서비스를 경험해보세요.
+          편리한 여행 계획 서비스를 경험해보세요.
         </p>
 
         <div className="relative flex justify-center items-center">

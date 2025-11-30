@@ -244,9 +244,9 @@ const LoginPage = () => {
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center gap-3 mb-2">
               <img src="/logo.png" alt="Logo" className="w-10 h-10 rounded-md" />
-              <span className="text-3xl font-extrabold tracking-tight text-gray-800">AI TRAVEL</span>
+              <span className="text-3xl font-extrabold tracking-tight text-gray-800">TRAVEL</span>
             </div>
-            <div className="text-sm text-gray-500">AI 여행 스케줄링 플래너</div>
+            <div className="text-sm text-gray-500">여행 스케줄링 플래너</div>
           </div>
 
           {/* 이메일/비밀번호 입력 */}

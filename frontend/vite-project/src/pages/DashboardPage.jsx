@@ -1,44 +1,22 @@
 /**
  * DashboardPage 컴포넌트
  * - 사용자의 여행 대시보드 페이지
- * - 현재 진행중인 여행들을 상태별로 표시
- * - 여행 상세 정보, 일정, 예산 등을 한눈에 확인 가능
+ * - 저장된 여행 계획들을 상태별로 표시
  */
 
-// React 기본 훅 import
 import React, { useState, useEffect } from 'react';
-
-// React Router DOM import (라우팅 관련)
 import { Link, useNavigate } from 'react-router-dom';
-
-// 인증 관련 커스텀 훅 import
 import { useAuth } from '../hooks/useAuth';
 
-/**
- * DashboardPage 컴포넌트
- * - 사용자의 여행 대시보드를 렌더링
- * - 여행 상태별 필터링 기능 제공
- * - 여행 목록과 상세 정보를 표시
- *
- * @returns {JSX.Element} 렌더링된 DashboardPage 컴포넌트
- */
 const DashboardPage = () => {
-  // 페이지 네비게이션을 위한 훅
   const navigate = useNavigate();
-  
-  // 인증 관련 상태와 함수들을 가져옴
   const { user, isAuthenticated } = useAuth();
 
-  // 여행 목록 상태 관리
   const [trips, setTrips] = useState([]);
-  
-  // 로딩 상태 관리
   const [loading, setLoading] = useState(true);
-  
-  // 선택된 필터 상태 관리 (전체, 계획중, 진행중, 완료됨)
   const [selectedFilter, setSelectedFilter] = useState('all');
 
-  // 여행 상태별 필터 옵션
+  // 필터 옵션
   const filterOptions = [
     { value: 'all', label: '전체 여행', count: 0 },
     { value: 'planning', label: '계획 중', count: 0 },
@@ -46,106 +24,63 @@ const DashboardPage = () => {
     { value: 'completed', label: '완료됨', count: 0 }
   ];
 
-  // 컴포넌트 마운트 시 여행 데이터 로드
   useEffect(() => {
-    loadTrips();
-  }, []);
+    if (user && user.id) {
+      loadTrips();
+    }
+  }, [user]);
 
   /**
    * 여행 데이터를 로드하는 함수
-   * - 실제 서비스에서는 API 호출로 데이터를 가져옴
-   * - 현재는 데모용 더미 데이터를 사용
+   * - 전체 여행 목록을 가져온 후 사용자별로 필터링
    */
   const loadTrips = async () => {
+    if (!user || !user.id) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       
-      // TODO: 실제 API 호출로 변경
-      // const response = await fetch('/api/trips');
-      // const data = await response.json();
+      // 전체 여행 목록 가져오기
+      const response = await fetch(`http://localhost:8081/api/trips`);
       
-      // 데모용 더미 데이터
-      const dummyTrips = [
-        {
-          id: 1,
-          title: "2025 파리 여행",
-          destination: "파리",
-          startDate: "2025-03-15",
-          endDate: "2025-03-22",
-          numAdults: 2,
-          numChildren: 0,
-          totalBudget: 3000000,
-          status: "planning",
-          createdAt: "2025-01-15T10:00:00",
-          updatedAt: "2025-01-15T10:00:00",
-          days: [
-            {
-              id: 1,
-              dayNumber: 1,
-              date: "2025-03-15",
-              weatherInfo: '{"temp": 15, "weather": "맑음"}',
-              itineraryItems: [
-                {
-                  id: 1,
-                  title: "에펠탑 관광",
-                  locationName: "에펠탑",
-                  startTime: "09:00",
-                  endTime: "11:00",
-                  estimatedCost: 50000,
-                  category: "관광",
-                  isConfirmed: true
-                },
-                {
-                  id: 2,
-                  title: "카페 드 플뢰르 점심",
-                  locationName: "카페 드 플뢰르",
-                  startTime: "12:00",
-                  endTime: "14:00",
-                  estimatedCost: 80000,
-                  category: "식사",
-                  isConfirmed: false
-                }
-              ]
-            }
-          ]
-        },
-        {
-          id: 2,
-          title: "제주도 3박4일",
-          destination: "제주도",
-          startDate: "2025-02-20",
-          endDate: "2025-02-23",
-          numAdults: 2,
-          numChildren: 1,
-          totalBudget: 1500000,
-          status: "ongoing",
-          createdAt: "2025-01-10T14:30:00",
-          updatedAt: "2025-01-12T09:15:00",
-          days: []
-        },
-        {
-          id: 3,
-          title: "도쿄 여행",
-          destination: "도쿄",
-          startDate: "2025-01-25",
-          endDate: "2025-01-30",
-          numAdults: 1,
-          numChildren: 0,
-          totalBudget: 2000000,
-          status: "completed",
-          createdAt: "2025-01-05T16:20:00",
-          updatedAt: "2025-01-20T11:45:00",
-          days: []
+      if (!response.ok) {
+        throw new Error('여행 데이터를 불러오는데 실패했습니다.');
+      }
+      
+      const allTrips = await response.json();
+      
+      console.log('📥 전체 여행 목록:', allTrips);
+      console.log('👤 현재 사용자 ID:', user.id, '타입:', typeof user.id);
+      
+      // 현재 사용자의 여행만 필터링
+      const userTrips = allTrips.filter(trip => {
+        // 타입 변환 처리 (문자열/숫자 모두 처리)
+        const tripUserId = trip.userId != null ? Number(trip.userId) : null;
+        const currentUserId = user.id != null ? Number(user.id) : null;
+        
+        console.log(`🔍 여행 ${trip.id}: trip.userId=${tripUserId} (${typeof trip.userId}), user.id=${currentUserId} (${typeof user.id}), 매칭=${tripUserId === currentUserId}`);
+        
+        if (tripUserId !== null && currentUserId !== null) {
+          return tripUserId === currentUserId;
         }
-      ];
+        // userId가 없으면 제외
+        return false;
+      });
       
-      setTrips(dummyTrips);
+      console.log('✅ 필터링된 여행 목록:', userTrips);
+      console.log('📊 필터링된 여행 수:', userTrips.length);
       
-      // 필터별 카운트 업데이트
-      updateFilterCounts(dummyTrips);
+      setTrips(userTrips);
+      updateFilterCounts(userTrips);
       
     } catch (error) {
       console.error('여행 데이터 로드 실패:', error);
+      // 에러 발생 시 빈 배열로 설정
+      setTrips([]);
+      updateFilterCounts([]);
     } finally {
       setLoading(false);
     }
@@ -153,19 +88,25 @@ const DashboardPage = () => {
 
   /**
    * 필터별 여행 수를 업데이트하는 함수
-   * - 각 상태별로 여행 수를 계산하여 필터 옵션에 반영
-   *
-   * @param {Array} tripList - 여행 목록
    */
   const updateFilterCounts = (tripList) => {
     const counts = {
       all: tripList.length,
-      planning: tripList.filter(trip => trip.status === 'planning' || trip.status === 'confirmed').length,
-      ongoing: tripList.filter(trip => trip.status === 'ongoing').length,
-      completed: tripList.filter(trip => trip.status === 'completed').length
+      planning: tripList.filter(trip => {
+        const status = trip.status?.toUpperCase();
+        return status === 'PLANNING' || status === 'planning' || trip.status === 'confirmed';
+      }).length,
+      ongoing: tripList.filter(trip => {
+        const status = trip.status?.toUpperCase();
+        return status === 'ONGOING' || status === 'ongoing';
+      }).length,
+      completed: tripList.filter(trip => {
+        const status = trip.status?.toUpperCase();
+        return status === 'COMPLETED' || status === 'completed';
+      }).length
     };
     
-    // 필터 옵션의 카운트 업데이트
+    // 필터 옵션 업데이트는 상태로 관리하지 않고 계산으로 처리
     filterOptions.forEach(option => {
       option.count = counts[option.value];
     });
@@ -173,63 +114,71 @@ const DashboardPage = () => {
 
   /**
    * 선택된 필터에 따라 여행 목록을 필터링하는 함수
-   * - 'all' 선택 시 모든 여행 반환
-   * - 특정 상태 선택 시 해당 상태의 여행만 반환
-   *
-   * @returns {Array} 필터링된 여행 목록
    */
   const getFilteredTrips = () => {
     if (selectedFilter === 'all') {
       return trips;
     }
     if (selectedFilter === 'planning') {
-      return trips.filter(trip => trip.status === 'planning' || trip.status === 'confirmed');
+      return trips.filter(trip => {
+        const status = trip.status?.toUpperCase();
+        return status === 'PLANNING' || status === 'planning' || trip.status === 'confirmed';
+      });
     }
-    return trips.filter(trip => trip.status === selectedFilter);
+    if (selectedFilter === 'ongoing') {
+      return trips.filter(trip => {
+        const status = trip.status?.toUpperCase();
+        return status === 'ONGOING' || status === 'ongoing';
+      });
+    }
+    if (selectedFilter === 'completed') {
+      return trips.filter(trip => {
+        const status = trip.status?.toUpperCase();
+        return status === 'COMPLETED' || status === 'completed';
+      });
+    }
+    return trips;
   };
 
   /**
    * 여행 상태에 따른 배지 스타일을 반환하는 함수
-   * - 각 상태별로 다른 색상과 텍스트를 표시
-   *
-   * @param {string} status - 여행 상태
-   * @returns {Object} 배지 스타일 객체
    */
   const getStatusBadgeStyle = (status) => {
+    const normalizedStatus = status?.toUpperCase();
     const styles = {
+      PLANNING: 'bg-yellow-100 text-yellow-800',
       planning: 'bg-yellow-100 text-yellow-800',
-      confirmed: 'bg-blue-100 text-blue-800',
+      confirmed: 'bg-yellow-100 text-yellow-800',
+      ONGOING: 'bg-green-100 text-green-800',
       ongoing: 'bg-green-100 text-green-800',
+      COMPLETED: 'bg-gray-100 text-gray-800',
       completed: 'bg-gray-100 text-gray-800'
     };
-    return styles[status] || 'bg-gray-100 text-gray-800';
+    return styles[status] || styles[normalizedStatus] || 'bg-gray-100 text-gray-800';
   };
 
   /**
    * 여행 상태를 한국어로 변환하는 함수
-   * - 백엔드 엔티티의 상태값을 사용자 친화적인 텍스트로 변환
-   *
-   * @param {string} status - 여행 상태
-   * @returns {string} 한국어 상태 텍스트
    */
   const getStatusText = (status) => {
+    const normalizedStatus = status?.toUpperCase();
     const statusMap = {
+      PLANNING: '계획 중',
       planning: '계획 중',
-      confirmed: '계획 중', // 확정됨도 계획 중으로 표시
+      confirmed: '계획 중',
+      ONGOING: '진행 중',
       ongoing: '진행 중',
+      COMPLETED: '완료됨',
       completed: '완료됨'
     };
-    return statusMap[status] || status;
+    return statusMap[status] || statusMap[normalizedStatus] || status || '계획 중';
   };
 
   /**
    * 날짜를 한국어 형식으로 포맷하는 함수
-   * - YYYY-MM-DD 형식을 YYYY년 MM월 DD일 형식으로 변환
-   *
-   * @param {string} dateString - 날짜 문자열
-   * @returns {string} 포맷된 날짜 문자열
    */
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -238,15 +187,21 @@ const DashboardPage = () => {
     });
   };
 
-  /**
-   * 예산을 천 단위로 포맷하는 함수
-   * - 숫자를 천 단위로 구분하여 표시
-   *
-   * @param {number} amount - 금액
-   * @returns {string} 포맷된 금액 문자열
-   */
-  const formatBudget = (amount) => {
-    return amount ? amount.toLocaleString('ko-KR') + '원' : '미설정';
+  // 필터별 카운트 계산
+  const filterCounts = {
+    all: trips.length,
+    planning: trips.filter(trip => {
+      const status = trip.status?.toUpperCase();
+      return status === 'PLANNING' || status === 'planning' || trip.status === 'confirmed';
+    }).length,
+    ongoing: trips.filter(trip => {
+      const status = trip.status?.toUpperCase();
+      return status === 'ONGOING' || status === 'ongoing';
+    }).length,
+    completed: trips.filter(trip => {
+      const status = trip.status?.toUpperCase();
+      return status === 'COMPLETED' || status === 'completed';
+    }).length
   };
 
   // 인증되지 않은 사용자는 로그인 페이지로 리다이렉트
@@ -266,6 +221,8 @@ const DashboardPage = () => {
     );
   }
 
+  const filteredTrips = getFilteredTrips();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 페이지 헤더 */}
@@ -281,8 +238,8 @@ const DashboardPage = () => {
               </p>
             </div>
             <Link
-              to="/trip-plan"
-              className="bg-black hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
+              to="/trip-plan-ex1"
+              className="bg-black hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
             >
               새 여행 계획하기
             </Link>
@@ -307,7 +264,7 @@ const DashboardPage = () => {
               >
                 {option.label}
                 <span className="ml-2 bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs">
-                  {option.count}
+                  {filterCounts[option.value]}
                 </span>
               </button>
             ))}
@@ -320,9 +277,9 @@ const DashboardPage = () => {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <span className="ml-3 text-gray-600">여행 데이터를 불러오는 중...</span>
           </div>
-        ) : (
+        ) : filteredTrips.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {getFilteredTrips().map((trip) => (
+            {filteredTrips.map((trip) => (
               <div
                 key={trip.id}
                 className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200"
@@ -355,72 +312,43 @@ const DashboardPage = () => {
                 {/* 여행 카드 본문 */}
                 <div className="p-6">
                   <div className="space-y-4">
-                    {/* 예산 정보 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">총 예산</span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {formatBudget(trip.totalBudget)}
-                      </span>
-                    </div>
-
-                    {/* 일정 정보 */}
+                    {/* 일정 수 */}
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">일정 수</span>
                       <span className="text-sm font-semibold text-gray-900">
-                        {trip.days?.length || 0}일
+                        {trip.daysCount || 0}일
                       </span>
                     </div>
 
-                    {/* 확정된 일정 수 */}
-                    {trip.days && trip.days.length > 0 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">확정된 일정</span>
-                        <span className="text-sm font-semibold text-gray-900">
-                          {trip.days.reduce((count, day) => 
-                            count + (day.itineraryItems?.filter(item => item.isConfirmed).length || 0), 0
-                          )}개
-                        </span>
-                      </div>
-                    )}
-
-                    {/* 마지막 수정일 */}
+                    {/* 일정 항목 수 */}
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">마지막 수정</span>
-                      <span className="text-sm text-gray-500">
-                        {formatDate(trip.updatedAt)}
+                      <span className="text-sm text-gray-600">일정 항목</span>
+                      <span className="text-sm font-semibold text-gray-900">
+                        {trip.totalItineraryItemsCount || 0}개
                       </span>
                     </div>
                   </div>
 
                   {/* 액션 버튼 */}
                   <div className="mt-6 flex space-x-3">
-                    <Link
-                      to={`/trip-detail/${trip.id}`}
+                    <button
+                      onClick={() => navigate(`/trip-detail/${trip.id}`)}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
                     >
                       상세보기
-                    </Link>
-                    {trip.status === 'completed' ? (
-                      <button 
-                        onClick={() => navigate(`/trip-archive/${trip.id}`)}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
-                      >
-                        여행 아카이브
-                      </button>
-                    ) : (
-                      <button className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200">
-                        수정하기
-                      </button>
-                    )}
+                    </button>
+                    <button 
+                      onClick={() => navigate(`/trip-plan-ex1?tripId=${trip.id}`)}
+                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                    >
+                      수정하기
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        )}
-
-        {/* 여행이 없는 경우 */}
-        {!loading && getFilteredTrips().length === 0 && (
+        ) : (
           <div className="text-center py-12">
             <div className="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -437,7 +365,7 @@ const DashboardPage = () => {
               }
             </p>
             <Link
-              to="/trip-plan"
+              to="/trip-plan-ex1"
               className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
             >
               여행 계획하기
