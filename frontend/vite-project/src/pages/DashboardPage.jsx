@@ -24,27 +24,22 @@ const DashboardPage = () => {
     { value: 'completed', label: '완료됨', count: 0 }
   ];
 
+  // 페이지 진입 시 한 번만 전체 여행 목록 로드
   useEffect(() => {
-    if (user && user.id) {
-      loadTrips();
-    }
-  }, [user]);
+    loadTrips();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * 여행 데이터를 로드하는 함수
    * - 전체 여행 목록을 가져온 후 사용자별로 필터링
    */
   const loadTrips = async () => {
-    if (!user || !user.id) {
-      setLoading(false);
-      return;
-    }
-
     try {
       setLoading(true);
       
-      // 전체 여행 목록 가져오기
-      const response = await fetch(`http://localhost:8081/api/trips`);
+      // 전체 여행 목록 가져오기 (유저 필터링 없이 모두, 간단 정보만)
+      const response = await fetch(`http://localhost:8081/api/trips/simple`);
       
       if (!response.ok) {
         throw new Error('여행 데이터를 불러오는데 실패했습니다.');
@@ -52,29 +47,11 @@ const DashboardPage = () => {
       
       const allTrips = await response.json();
       
-      console.log('📥 전체 여행 목록:', allTrips);
-      console.log('👤 현재 사용자 ID:', user.id, '타입:', typeof user.id);
+      console.log('📥 전체 여행 목록 (summary, 필터링 없이 모두 표시):', allTrips);
       
-      // 현재 사용자의 여행만 필터링
-      const userTrips = allTrips.filter(trip => {
-        // 타입 변환 처리 (문자열/숫자 모두 처리)
-        const tripUserId = trip.userId != null ? Number(trip.userId) : null;
-        const currentUserId = user.id != null ? Number(user.id) : null;
-        
-        console.log(`🔍 여행 ${trip.id}: trip.userId=${tripUserId} (${typeof trip.userId}), user.id=${currentUserId} (${typeof user.id}), 매칭=${tripUserId === currentUserId}`);
-        
-        if (tripUserId !== null && currentUserId !== null) {
-          return tripUserId === currentUserId;
-        }
-        // userId가 없으면 제외
-        return false;
-      });
-      
-      console.log('✅ 필터링된 여행 목록:', userTrips);
-      console.log('📊 필터링된 여행 수:', userTrips.length);
-      
-      setTrips(userTrips);
-      updateFilterCounts(userTrips);
+      // 일단 모든 여행을 대시보드에 그대로 표시
+      setTrips(allTrips);
+      updateFilterCounts(allTrips);
       
     } catch (error) {
       console.error('여행 데이터 로드 실패:', error);
@@ -291,10 +268,6 @@ const DashboardPage = () => {
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         {trip.title}
                       </h3>
-                      <p className="text-gray-600 mb-3">
-                        {trip.destination} • {trip.numAdults}명
-                        {trip.numChildren > 0 && ` + ${trip.numChildren}명`}
-                      </p>
                       <div className="flex items-center space-x-4 text-sm text-gray-500">
                         <span>{formatDate(trip.startDate)}</span>
                         <span>~</span>
@@ -311,24 +284,11 @@ const DashboardPage = () => {
 
                 {/* 여행 카드 본문 */}
                 <div className="p-6">
-                  <div className="space-y-4">
-                    {/* 일정 수 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">일정 수</span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {trip.daysCount || 0}일
-                      </span>
-                    </div>
-
-                    {/* 일정 항목 수 */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">일정 항목</span>
-                      <span className="text-sm font-semibold text-gray-900">
-                        {trip.totalItineraryItemsCount || 0}개
-                      </span>
-                    </div>
+                  {/* 여행 일차 수 / 일정 항목 수 간단 표기 */}
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <p>여행 일수: {trip.daysCount ?? 0}일</p>
+                    <p>여행 목록: {trip.totalItineraryItemsCount ?? 0}개</p>
                   </div>
-
                   {/* 액션 버튼 */}
                   <div className="mt-6 flex space-x-3">
                     <button

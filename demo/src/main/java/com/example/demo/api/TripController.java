@@ -17,9 +17,9 @@ import com.example.demo.api.dto.TripDtos;
 import com.example.demo.api.dto.TripDayDtos;
 import com.example.demo.api.dto.TripItineraryItemDtos;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -76,45 +76,123 @@ public class TripController {
     }
 
     /**
-     * @GetMapping: HTTP GET 요청 매핑
-     * - URL: GET /api/trips
-     * - 모든 여행 목록을 조회하여 DTO로 변환하여 반환
-     * - @EntityGraph를 통해 TripDays와 TripItineraryItems를 함께 로드
-     * 
-     * @return 여행 목록 (TripDtos.Resp 리스트)
+     * 단일 여행 상세 조회
+     * - URL: GET /api/trips/{id}
+     * - Trip + TripDay + TripItineraryItem 전체 구조를 간단한 패널용 DTO로 반환
      */
-    @GetMapping
-    public List<TripDtos.Resp> list() {
-        System.out.println("📋 전체 여행 목록 조회 요청");
-        // @EntityGraph를 통해 TripDays, ItineraryItems, User를 함께 로드
-        List<Trip> trips = tripRepository.findAll();
-        System.out.println("📊 조회된 여행 수: " + trips.size());
-        
-        // User와 TripDays를 명시적으로 초기화
-        for (Trip trip : trips) {
-            // User 초기화
-            if (trip.getUser() != null) {
-                trip.getUser().getId(); // User 초기화
-            }
-            // TripDays 초기화
-            if (trip.getTripDays() != null) {
-                trip.getTripDays().size(); // TripDays 초기화
-                // 각 TripDay의 ItineraryItems 초기화
-                for (TripDay day : trip.getTripDays()) {
-                    if (day.getItineraryItems() != null) {
-                        day.getItineraryItems().size(); // ItineraryItems 초기화
-                    }
+    @GetMapping("/{id}")
+    @Transactional(readOnly = true)
+    public TripDtos.Resp getById(@PathVariable Long id) {
+        System.out.println("📋 여행 상세 조회 요청 - Trip ID: " + id);
+
+        Trip trip = tripRepository.findById(id).orElseThrow(() -> {
+            System.err.println("❌ 여행을 찾을 수 없음: " + id);
+            return new RuntimeException("여행을 찾을 수 없습니다: " + id);
+        });
+
+        // LAZY 컬렉션 미리 초기화 (일차와 각 일차의 일정 항목들)
+        List<TripDay> tripDays = trip.getTripDays();
+        if (tripDays != null) {
+            tripDays.size(); // TripDays 초기화
+            for (TripDay day : tripDays) {
+                if (day != null && day.getItineraryItems() != null) {
+                    day.getItineraryItems().size(); // ItineraryItems 초기화
                 }
             }
         }
-        
-        List<TripDtos.Resp> result = trips.stream().map(trip -> {
-            TripDtos.Resp resp = toResp(trip);
-            System.out.println("  - 여행 ID: " + resp.id + ", 제목: " + resp.title + ", 사용자 ID: " + resp.userId + ", 일차 수: " + resp.daysCount + ", 일정 항목 수: " + resp.totalItineraryItemsCount);
-            return resp;
+
+        TripDtos.Resp resp = toResp(trip);
+
+        // 일차 + 일정 항목을 DTO로 변환
+        if (tripDays != null) {
+            List<TripDayDtos.Resp> dayDtos = new ArrayList<>();
+            int totalItems = 0;
+
+            for (TripDay day : tripDays) {
+                if (day == null) continue;
+
+                TripDayDtos.Resp dayResp = new TripDayDtos.Resp();
+                dayResp.id = day.getId();
+                dayResp.dayNumber = day.getDayNumber();
+                dayResp.date = day.getDate();
+                dayResp.dayStartTime = day.getDayStartTime();
+                dayResp.dayEndTime = day.getDayEndTime();
+                dayResp.accommodationJson = day.getAccommodationJson();
+
+                List<TripItineraryItemDtos.Resp> itemDtos = new ArrayList<>();
+                List<TripItineraryItem> items = day.getItineraryItems();
+                if (items != null) {
+                    for (TripItineraryItem item : items) {
+                        if (item == null) continue;
+                        TripItineraryItemDtos.Resp itemResp = new TripItineraryItemDtos.Resp();
+                        itemResp.id = item.getId();
+                        itemResp.placeId = item.getPlaceId();
+                        itemResp.title = item.getTitle();
+                        itemResp.description = item.getDescription();
+                        itemResp.locationName = item.getLocationName();
+                        itemResp.address = item.getAddress();
+                        itemResp.latitude = item.getLatitude();
+                        itemResp.longitude = item.getLongitude();
+                        itemResp.startTime = item.getStartTime();
+                        itemResp.endTime = item.getEndTime();
+                        itemResp.category = item.getCategory();
+                        itemResp.stayDurationMinutes = item.getStayDurationMinutes();
+                        itemResp.travelToNextDistanceKm = item.getTravelToNextDistanceKm();
+                        itemResp.travelToNextDurationMinutes = item.getTravelToNextDurationMinutes();
+                        itemResp.travelToNextMode = item.getTravelToNextMode();
+                        itemResp.orderSequence = item.getOrderSequence();
+                        itemDtos.add(itemResp);
+                    }
+                }
+
+                totalItems += itemDtos.size();
+                dayResp.itineraryItems = itemDtos;
+                dayDtos.add(dayResp);
+            }
+
+            resp.days = dayDtos;
+            // daysCount / totalItineraryItemsCount가 비어있다면 다시 계산해 채워줌
+            if (resp.daysCount == null) {
+                resp.daysCount = dayDtos.size();
+            }
+            if (resp.totalItineraryItemsCount == null) {
+                resp.totalItineraryItemsCount = totalItems;
+            }
+        }
+
+        System.out.println("✅ 여행 상세 조회 완료 - Trip ID: " + id);
+        return resp;
+    }
+
+    /**
+     * 간단 여행 목록 조회 (대시보드용)
+     * - URL: GET /api/trips/simple
+     * - trips 테이블의 기본 정보만 반환 (일차/일정 관계는 조회하지 않음)
+     * - MultipleBagFetchException과 무관한 가벼운 쿼리
+     */
+    @GetMapping("/simple")
+    public List<TripDtos.SimpleResp> listSimple() {
+        System.out.println("📋 [대시보드] 간단 여행 목록 조회 요청");
+        List<TripRepository.TripSummaryProjection> rows = tripRepository.findAllSummaries();
+        System.out.println("📊 조회된 여행 수 (summary): " + rows.size());
+
+        List<TripDtos.SimpleResp> result = rows.stream().map(row -> {
+            TripDtos.SimpleResp r = new TripDtos.SimpleResp();
+            r.id = row.getId();
+            r.title = row.getTitle();
+            r.destination = row.getDestination();
+            r.destinationPlaceId = row.getDestinationPlaceId();
+            r.startDate = row.getStartDate();
+            r.endDate = row.getEndDate();
+            r.numAdults = row.getNumAdults();
+            r.numChildren = row.getNumChildren();
+            r.status = row.getStatus();
+            r.daysCount = row.getDaysCount();
+            r.totalItineraryItemsCount = row.getTotalItineraryItemsCount();
+            return r;
         }).collect(Collectors.toList());
-        
-        System.out.println("✅ 전체 여행 목록 반환 완료 - " + result.size() + "개");
+
+        System.out.println("✅ [대시보드] 간단 여행 목록 반환 완료 - " + result.size() + "개");
         return result;
     }
 
@@ -266,51 +344,86 @@ public class TripController {
      * @return TripDtos.Resp DTO
      */
     private TripDtos.Resp toResp(Trip t) {
-        TripDtos.Resp r = new TripDtos.Resp();
-        r.id = t.getId();
-        r.title = t.getTitle();
-        r.destination = t.getDestination();
-        r.destinationPlaceId = t.getDestinationPlaceId();
-        r.destinationLat = t.getDestinationLat();
-        r.destinationLng = t.getDestinationLng();
-        r.startDate = t.getStartDate();
-        r.endDate = t.getEndDate();
-        r.numAdults = t.getNumAdults();
-        r.numChildren = t.getNumChildren();
-        r.totalBudget = t.getTotalBudget();
-        r.status = t.getStatus();
-        
-        // 사용자 ID 설정
-        if (t.getUser() != null) {
-            r.userId = t.getUser().getId();
-            System.out.println("    👤 사용자 ID 설정: " + r.userId);
-        } else {
-            System.out.println("    ⚠️ 사용자 정보 없음");
+        if (t == null) {
+            System.err.println("❌ Trip 엔티티가 null입니다");
+            return null;
         }
         
-        // 일차 수 및 일정 항목 수 계산
-        // LAZY 로딩을 강제로 초기화
+        TripDtos.Resp r = new TripDtos.Resp();
+        
         try {
-            if (t.getTripDays() != null) {
-                // TripDays 초기화
-                int daysSize = t.getTripDays().size();
-                r.daysCount = daysSize;
-                
-                // 각 TripDay의 ItineraryItems 초기화 및 계산
-                int totalItems = 0;
-                for (TripDay day : t.getTripDays()) {
-                    if (day.getItineraryItems() != null) {
-                        totalItems += day.getItineraryItems().size();
-                    }
+            r.id = t.getId();
+            r.title = t.getTitle() != null ? t.getTitle() : "제목 없음";
+            r.destination = t.getDestination() != null ? t.getDestination() : "";
+            r.destinationPlaceId = t.getDestinationPlaceId();
+            r.destinationLat = t.getDestinationLat();
+            r.destinationLng = t.getDestinationLng();
+            r.startDate = t.getStartDate();
+            r.endDate = t.getEndDate();
+            r.numAdults = t.getNumAdults();
+            r.numChildren = t.getNumChildren();
+            r.totalBudget = t.getTotalBudget();
+            r.status = t.getStatus() != null ? t.getStatus() : "planning";
+            
+            // 사용자 ID 설정 (안전하게 처리)
+            try {
+                User user = t.getUser();
+                if (user != null) {
+                    r.userId = user.getId();
+                    System.out.println("    👤 사용자 ID 설정: " + r.userId);
+                } else {
+                    System.out.println("    ⚠️ 여행 ID " + t.getId() + "의 사용자 정보 없음");
+                    r.userId = null;
                 }
-                r.totalItineraryItemsCount = totalItems;
-            } else {
+            } catch (Exception e) {
+                System.err.println("    ❌ 사용자 정보 조회 실패: " + e.getMessage());
+                r.userId = null;
+            }
+            
+            // 일차 수 및 일정 항목 수 계산 (안전하게 처리)
+            try {
+                List<TripDay> tripDays = t.getTripDays();
+                if (tripDays != null && !tripDays.isEmpty()) {
+                    // TripDays 초기화
+                    int daysSize = tripDays.size();
+                    r.daysCount = daysSize;
+                    System.out.println("    📅 일차 수: " + daysSize);
+                    
+                    // 각 TripDay의 ItineraryItems 초기화 및 계산
+                    int totalItems = 0;
+                    for (TripDay day : tripDays) {
+                        try {
+                            if (day != null) {
+                                List<TripItineraryItem> items = day.getItineraryItems();
+                                if (items != null) {
+                                    totalItems += items.size();
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.err.println("    ⚠️ 일차 ID " + (day != null ? day.getId() : "null") + "의 일정 항목 조회 실패: " + e.getMessage());
+                        }
+                    }
+                    r.totalItineraryItemsCount = totalItems;
+                    System.out.println("    📝 총 일정 항목 수: " + totalItems);
+                } else {
+                    r.daysCount = 0;
+                    r.totalItineraryItemsCount = 0;
+                    System.out.println("    ⚠️ 여행 ID " + t.getId() + "의 일차 정보 없음");
+                }
+            } catch (Exception e) {
+                // LAZY 로딩 초기화 실패 시 0으로 설정
+                System.err.println("    ❌ TripDays 로딩 실패: " + e.getMessage());
+                e.printStackTrace();
                 r.daysCount = 0;
                 r.totalItineraryItemsCount = 0;
             }
         } catch (Exception e) {
-            // LAZY 로딩 초기화 실패 시 0으로 설정
-            System.err.println("⚠️ TripDays 로딩 실패: " + e.getMessage());
+            System.err.println("❌ Trip DTO 변환 중 예외 발생: " + e.getMessage());
+            e.printStackTrace();
+            // 최소한의 정보라도 반환
+            r.id = t.getId();
+            r.title = "변환 실패";
+            r.userId = null;
             r.daysCount = 0;
             r.totalItineraryItemsCount = 0;
         }

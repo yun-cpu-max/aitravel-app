@@ -31,6 +31,7 @@ public class TripDayDtos {
         public LocalTime dayStartTime;
         public LocalTime dayEndTime;
         public String accommodationJson;
+        public List<TripItineraryItemDtos.Resp> itineraryItems; // 일정 항목 목록 (상세 보기용)
     }
 }
 

@@ -31,6 +31,7 @@ public class TripDtos {
         public List<TripDayDtos.CreateOrUpdateReq> days; // 일차별 정보
     }
 
+    /** 상세 응답 DTO (일차/일정 수 포함, 상세보기용) */
     public static class Resp {
         public Long id;
         public String title;
@@ -46,6 +47,22 @@ public class TripDtos {
         public String status;
         public Long userId; // 사용자 ID (필터링용)
         public Integer daysCount; // 일차 수
+        public Integer totalItineraryItemsCount; // 전체 일정 항목 수
+        public List<TripDayDtos.Resp> days; // 각 일차 상세 정보 (상세 보기용)
+    }
+
+    /** 대시보드용 간단 응답 DTO (trips 테이블 컬럼 + 일수/일정 개수 집계) */
+    public static class SimpleResp {
+        public Long id;
+        public String title;
+        public String destination;
+        public String destinationPlaceId;
+        public LocalDate startDate;
+        public LocalDate endDate;
+        public Integer numAdults;
+        public Integer numChildren;
+        public String status;
+        public Integer daysCount; // 여행 일차 수
         public Integer totalItineraryItemsCount; // 전체 일정 항목 수
     }
 }

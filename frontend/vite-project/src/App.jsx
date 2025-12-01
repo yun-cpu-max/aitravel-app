@@ -30,6 +30,7 @@ import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
 import TripArchivePage from './pages/TripArchivePage';
 import SignUpPage from './pages/sign-up';
+import TripDetailPage from './pages/TripDetailPage';
 
 /**
  * App 컴포넌트
@@ -101,6 +102,8 @@ function App() {
                   <Route path="/dashboard" element={<DashboardPage />} />
                   {/* 여행 기록 아카이브 페이지 라우트 */}
                   <Route path="/archive/:tripId" element={<TripArchivePage />} />
+                  {/* 여행 상세 페이지 라우트 */}
+                  <Route path="/trip-detail/:tripId" element={<TripDetailPage />} />
                 </Routes>
           </main>
 
