@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
 // 환경 변수에서 API 키를 사용합니다 (Vite: import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
@@ -46,6 +46,7 @@ const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 const TripPlanPageEx1 = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   
   // 0: 공통 입력, 1: 모드 선택, 2: 분기 본문(직접/AI), 3: 편집/확인
   const [step, setStep] = useState(0);
@@ -577,6 +578,31 @@ const TripPlanPageEx1 = () => {
   const [hasUnsavedChanges] = useState(false);
   const initialized = useRef(false);
 
+
+  // URL 쿼리 파라미터에서 도시 정보 읽어서 자동 입력
+  useEffect(() => {
+    const cityParam = searchParams.get('city');
+    const placeIdParam = searchParams.get('placeId');
+    
+    if (cityParam && !destinationInput) {
+      // URL에서 도시 이름을 가져와서 입력 필드에 설정
+      const decodedCity = decodeURIComponent(cityParam);
+      setDestinationInput(decodedCity);
+      
+      // placeId가 있으면 selectedDestination도 설정
+      if (placeIdParam) {
+        const decodedPlaceId = decodeURIComponent(placeIdParam);
+        setSelectedDestination(prev => ({
+          ...prev,
+          name: decodedCity,
+          placeId: decodedPlaceId
+        }));
+        
+        // placeId로 상세 정보 가져오기 (선택사항)
+        // 필요하면 여기서 details API 호출하여 lat/lng도 설정 가능
+      }
+    }
+  }, [searchParams, destinationInput]);
 
   // 로컬 스토리지 초기화 강제는 제거 (입력 중 포커스/값 리셋 방지)
   useEffect(() => {
@@ -4064,8 +4090,11 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
   const polylineRef = React.useRef(null);
   const [mapReady, setMapReady] = React.useState(false);
 
+  // 지도 초기화는 한 번만 실행 (centerLat, centerLng 변경 시 재생성 방지)
   React.useEffect(() => {
     if (!apiKey) return;
+    if (mapRefInstance.current) return; // 이미 지도가 생성되어 있으면 스킵
+    
     const ensure = () => new Promise((resolve, reject) => {
       if (window.google && window.google.maps) return resolve(window.google.maps);
       const id = 'gmaps-js-sdk';
@@ -4108,20 +4137,21 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
       console.error('Failed to load Google Maps:', err);
     });
     return () => { cancelled = true; };
-  }, [apiKey, mapId, centerLat, centerLng]);
+    // centerLat, centerLng는 초기값으로만 사용하고, 이후 변경은 별도 useEffect에서 처리
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apiKey, mapId]);
 
   // 선택된 장소 마커 표시 (번호 라벨 포함)
   React.useEffect(() => {
     if (!mapReady || !window.google || !window.google.maps) {
-      console.log('Google Maps not loaded yet, mapReady:', mapReady);
+      // mapReady가 false일 때는 로그 출력하지 않음 (초기화 중 반복 로그 방지)
       return;
     }
     if (!mapRefInstance.current) {
-      console.log('Map instance not ready');
       return;
     }
 
-    console.log('Creating markers for selected places:', selectedPlaces);
+    // 디버그 로그 제거 또는 최소화
 
     // 기존 마커 제거
     markersRef.current.forEach((m) => {
@@ -4138,20 +4168,11 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
     const maps = window.google.maps;
     const selectedPlacesList = Array.isArray(selectedPlaces) ? selectedPlaces : [];
 
-    console.log('Selected places list:', selectedPlacesList);
-
     // 일자별 색상 정의
     const dayColors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
     
     // 선택된 장소에 번호 마커 표시 (좌표가 있는 경우)
     selectedPlacesList.forEach((place, index) => {
-      console.log(`Place ${index + 1}:`, {
-        name: place.name,
-        lat: place.lat,
-        lng: place.lng,
-        hasLatLng: typeof place.lat === 'number' && typeof place.lng === 'number'
-      });
-
       if (typeof place.lat === 'number' && typeof place.lng === 'number') {
         const pos = { lat: place.lat, lng: place.lng };
         const markerNumber = index + 1;
@@ -4181,7 +4202,6 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
             }
           });
           
-          console.log(`Marker ${markerNumber} created successfully at`, pos);
           markersRef.current.push(marker);
         } catch (error) {
           console.error(`Error creating marker ${markerNumber}:`, error);
@@ -4191,11 +4211,8 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
       }
     });
 
-    console.log(`Total place markers created: ${markersRef.current.length}`);
-
     // 숙소 마커 추가 (연두색, 선으로 연결하지 않음)
     const accommodationsList = Array.isArray(selectedAccommodations) ? selectedAccommodations : [];
-    console.log('Creating accommodation markers:', accommodationsList);
 
     accommodationsList.forEach((acc) => {
       const accommodation = acc.accommodation;
@@ -4225,7 +4242,6 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
             }
           });
           
-          console.log(`Accommodation marker ${dayNumber} created successfully at`, pos);
           markersRef.current.push(marker);
         } catch (error) {
           console.error(`Error creating accommodation marker ${dayNumber}:`, error);
@@ -4235,7 +4251,6 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
       }
     });
 
-    console.log(`Total markers created (places + accommodations): ${markersRef.current.length}`);
 
     // 장소들을 순서대로 선으로 연결 + 마지막 장소에서 숙소로 연결
     if (selectedPlacesList.length > 0) {
@@ -4270,7 +4285,6 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
           strokeWeight: 3,
         });
         polylineRef.current.setMap(mapRefInstance.current);
-        console.log('Polyline created connecting', pathCoordinates.length, 'points (including accommodation)');
       }
     }
 
@@ -4294,8 +4308,6 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
         validCoords++;
       }
     });
-
-    console.log(`Valid coordinates for bounds: ${validCoords}`);
     
     if (validCoords > 0) {
       // 장소가 1개일 경우

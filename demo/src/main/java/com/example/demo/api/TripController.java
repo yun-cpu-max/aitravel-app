@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -165,10 +166,33 @@ public class TripController {
     }
 
     /**
+     * 여행 상태를 날짜 기준으로 자동 계산하는 헬퍼 메서드
+     * - 오늘 < 시작일: planning (계획 중)
+     * - 시작일 <= 오늘 <= 종료일: ongoing (진행 중)
+     * - 오늘 > 종료일: completed (완료됨)
+     */
+    private String calculateStatus(LocalDate startDate, LocalDate endDate, String currentStatus) {
+        if (startDate == null || endDate == null) {
+            return currentStatus != null ? currentStatus : "planning";
+        }
+        
+        LocalDate today = LocalDate.now();
+        
+        if (today.isBefore(startDate)) {
+            return "planning"; // 아직 시작 전
+        } else if (today.isAfter(endDate)) {
+            return "completed"; // 이미 종료됨
+        } else {
+            return "ongoing"; // 진행 중
+        }
+    }
+
+    /**
      * 간단 여행 목록 조회 (대시보드용)
      * - URL: GET /api/trips/simple
      * - trips 테이블의 기본 정보만 반환 (일차/일정 관계는 조회하지 않음)
      * - MultipleBagFetchException과 무관한 가벼운 쿼리
+     * - 여행 상태는 날짜 기준으로 자동 계산
      */
     @GetMapping("/simple")
     public List<TripDtos.SimpleResp> listSimple() {
@@ -186,7 +210,11 @@ public class TripController {
             r.endDate = row.getEndDate();
             r.numAdults = row.getNumAdults();
             r.numChildren = row.getNumChildren();
-            r.status = row.getStatus();
+            
+            // 날짜 기준으로 상태 자동 계산
+            String calculatedStatus = calculateStatus(row.getStartDate(), row.getEndDate(), row.getStatus());
+            r.status = calculatedStatus;
+            
             r.daysCount = row.getDaysCount();
             r.totalItineraryItemsCount = row.getTotalItineraryItemsCount();
             return r;
@@ -363,7 +391,9 @@ public class TripController {
             r.numAdults = t.getNumAdults();
             r.numChildren = t.getNumChildren();
             r.totalBudget = t.getTotalBudget();
-            r.status = t.getStatus() != null ? t.getStatus() : "planning";
+            // 날짜 기준으로 상태 자동 계산
+            String calculatedStatus = calculateStatus(t.getStartDate(), t.getEndDate(), t.getStatus());
+            r.status = calculatedStatus;
             
             // 사용자 ID 설정 (안전하게 처리)
             try {
