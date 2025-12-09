@@ -324,6 +324,7 @@ const TripPlanPageEx1 = () => {
   
   // 장소 상세 모달 상태
   const [placeDetailModal, setPlaceDetailModal] = useState(null); // 선택된 장소의 상세 정보
+  const [placeDetailData, setPlaceDetailData] = useState(null); // Google Places API에서 가져온 추가 정보
   
   // 장소 등록 모달 상태
   const [placeRegistrationModal, setPlaceRegistrationModal] = useState(false);
@@ -788,7 +789,6 @@ const TripPlanPageEx1 = () => {
           />
         </div>
 
-        {/* 왼쪽 단계 표시 영역 - 마이로 스타일 */}
         <div className="absolute left-0 top-0 bottom-0 w-[110px] bg-white shadow-lg flex flex-col z-10 border-r border-gray-200">
           {/* 단계 목록 */}
           <div className="flex-1 pt-8 pb-4">
@@ -933,7 +933,23 @@ const TripPlanPageEx1 = () => {
                       <div 
                         key={place.id} 
                         className="flex gap-2.5 p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors cursor-pointer bg-white"
-                        onClick={() => setPlaceDetailModal(place)}
+                        onClick={() => {
+                          setPlaceDetailModal(place);
+                          // placeId가 있으면 추가 정보 가져오기
+                          if (place.id) {
+                            fetch(`/api/places/details?placeId=${encodeURIComponent(place.id)}`)
+                              .then(res => res.json())
+                              .then(data => {
+                                setPlaceDetailData(data);
+                              })
+                              .catch(err => {
+                                console.error('장소 상세 정보 가져오기 실패:', err);
+                                setPlaceDetailData(null);
+                              });
+                          } else {
+                            setPlaceDetailData(null);
+                          }
+                        }}
                       >
                         {/* 썸네일 */}
                         <img 
@@ -1169,13 +1185,22 @@ const TripPlanPageEx1 = () => {
 
       {/* 장소 상세 정보 모달 */}
       {placeDetailModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" onClick={() => setPlaceDetailModal(null)}>
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50" 
+          onClick={() => {
+            setPlaceDetailModal(null);
+            setPlaceDetailData(null);
+          }}
+        >
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4" onClick={(e) => e.stopPropagation()}>
             {/* 모달 헤더 */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
               <h3 className="text-xl font-semibold text-gray-800">장소 정보</h3>
               <button 
-                onClick={() => setPlaceDetailModal(null)}
+                onClick={() => {
+                  setPlaceDetailModal(null);
+                  setPlaceDetailData(null);
+                }}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1220,28 +1245,193 @@ const TripPlanPageEx1 = () => {
               </div>
 
               {/* 평점 정보 */}
-              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-200">
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                  <span className="text-lg font-semibold text-gray-800">{placeDetailModal.rating}</span>
+              {(placeDetailData?.rating || placeDetailData?.userRatingCount || placeDetailModal.rating || placeDetailModal.likes) && (
+                <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-200">
+                  {(placeDetailData?.rating || placeDetailModal.rating) && (
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      <span className="text-lg font-semibold text-gray-800">
+                        {placeDetailData?.rating || placeDetailModal.rating}
+                      </span>
+                    </div>
+                  )}
+                  {(placeDetailData?.userRatingCount || placeDetailModal.likes) && (
+                    <div className="flex items-center gap-2">
+                      <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-gray-600">
+                        {placeDetailData?.userRatingCount || placeDetailModal.likes} 리뷰
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-gray-600">{placeDetailModal.likes} 리뷰</span>
-                </div>
-              </div>
+              )}
 
-              {/* 설명 */}
-              {placeDetailModal.description ? (
+              {/* Google Places API에서 가져온 추가 정보 */}
+              {placeDetailData && (
+                <>
+                  {/* 설명 - 저장된 한글 설명 우선, editorialSummary는 한글일 때만 표시 */}
+                  {(placeDetailModal.description || (placeDetailData.editorialSummary?.text && /[가-힣]/.test(placeDetailData.editorialSummary.text))) && (
+                    <div className="mb-6">
+                      <h5 className="text-lg font-semibold text-gray-800 mb-2">장소 소개</h5>
+                      <p className="text-gray-600 leading-relaxed">
+                        {placeDetailModal.description || (placeDetailData.editorialSummary?.text && /[가-힣]/.test(placeDetailData.editorialSummary.text) ? placeDetailData.editorialSummary.text : '')}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* 설명이 없는 경우 */}
+                  {!placeDetailModal.description && (!placeDetailData.editorialSummary?.text || !/[가-힣]/.test(placeDetailData.editorialSummary.text)) && (
+                    <div className="mb-6">
+                      <p className="text-gray-400 text-sm italic">이 장소에 대한 설명이 제공되지 않았습니다.</p>
+                    </div>
+                  )}
+
+                  {/* 영업 시간 */}
+                  {(placeDetailData.currentOpeningHours || placeDetailData.regularOpeningHours) && (
+                    <div className="mb-6">
+                      <h5 className="text-lg font-semibold text-gray-800 mb-3">영업 시간</h5>
+                      {(() => {
+                        const openingHours = placeDetailData.currentOpeningHours || placeDetailData.regularOpeningHours;
+                        const weekdayTexts = openingHours?.weekdayDescriptions || [];
+                        const openNow = openingHours?.openNow;
+                        
+                        // 요일 영어를 한글로 변환
+                        const translateWeekday = (text) => {
+                          if (!text) return text;
+                          // 이미 한글이 포함되어 있으면 그대로 반환
+                          if (/[가-힣]/.test(text)) return text;
+                          
+                          return text
+                            .replace(/Monday/g, '월요일')
+                            .replace(/Tuesday/g, '화요일')
+                            .replace(/Wednesday/g, '수요일')
+                            .replace(/Thursday/g, '목요일')
+                            .replace(/Friday/g, '금요일')
+                            .replace(/Saturday/g, '토요일')
+                            .replace(/Sunday/g, '일요일')
+                            .replace(/Mon\./g, '월')
+                            .replace(/Tue\./g, '화')
+                            .replace(/Wed\./g, '수')
+                            .replace(/Thu\./g, '목')
+                            .replace(/Fri\./g, '금')
+                            .replace(/Sat\./g, '토')
+                            .replace(/Sun\./g, '일')
+                            .replace(/\bAM\b/g, '오전')
+                            .replace(/\bPM\b/g, '오후')
+                            .replace(/Closed/g, '휴무')
+                            .replace(/Open 24 hours/g, '24시간 영업')
+                            .replace(/Open/g, '영업');
+                        };
+                        
+                        return (
+                          <div className="space-y-2">
+                            {openNow !== undefined && (
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  openNow 
+                                    ? 'bg-green-100 text-green-700' 
+                                    : 'bg-red-100 text-red-700'
+                                }`}>
+                                  {openNow ? '🟢 영업 중' : '🔴 영업 종료'}
+                                </span>
+                              </div>
+                            )}
+                            {weekdayTexts.length > 0 ? (
+                              <div className="space-y-1">
+                                {weekdayTexts.map((text, idx) => (
+                                  <p key={idx} className="text-sm text-gray-600">
+                                    {translateWeekday(text)}
+                                  </p>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500">영업 시간 정보가 없습니다.</p>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* 연락처 정보 */}
+                  {(placeDetailData.internationalPhoneNumber || placeDetailData.websiteUri) && (
+                    <div className="mb-6">
+                      <h5 className="text-lg font-semibold text-gray-800 mb-3">연락처 정보</h5>
+                      <div className="space-y-2">
+                        {placeDetailData.internationalPhoneNumber && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            <a 
+                              href={`tel:${placeDetailData.internationalPhoneNumber}`}
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {placeDetailData.internationalPhoneNumber}
+                            </a>
+                          </div>
+                        )}
+                        {placeDetailData.websiteUri && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                            </svg>
+                            <a 
+                              href={placeDetailData.websiteUri}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              웹사이트 방문
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 가격 수준 */}
+                  {placeDetailData.priceLevel && (
+                    <div className="mb-6">
+                      <h5 className="text-lg font-semibold text-gray-800 mb-2">가격 수준</h5>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4].map((level) => (
+                          <span
+                            key={level}
+                            className={`text-lg ${
+                              level <= placeDetailData.priceLevel
+                                ? 'text-green-600'
+                                : 'text-gray-300'
+                            }`}
+                          >
+                            ₩
+                          </span>
+                        ))}
+                        <span className="ml-2 text-sm text-gray-600">
+                          {placeDetailData.priceLevel === 1 && '(저렴함)'}
+                          {placeDetailData.priceLevel === 2 && '(보통)'}
+                          {placeDetailData.priceLevel === 3 && '(비쌈)'}
+                          {placeDetailData.priceLevel === 4 && '(매우 비쌈)'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* placeDetailData가 없을 때 기본 설명 표시 */}
+              {!placeDetailData && placeDetailModal.description && (
                 <div className="mb-6">
                   <h5 className="text-lg font-semibold text-gray-800 mb-2">장소 소개</h5>
                   <p className="text-gray-600 leading-relaxed">{placeDetailModal.description}</p>
                 </div>
-              ) : (
+              )}
+
+              {!placeDetailData && !placeDetailModal.description && (
                 <div className="mb-6">
                   <p className="text-gray-400 text-sm italic">이 장소에 대한 설명이 제공되지 않았습니다.</p>
                 </div>
@@ -2072,22 +2262,61 @@ const TripPlanPageEx1 = () => {
       });
     }
 
-    // --- [Step 2] 클러스터링: 각 장소를 가장 가까운 날짜에 가배정 (균등 분배 고려) ---
-    const dayCounts = Array(totalDays).fill(0); // 각 날짜별 배정된 장소 수 추적
+    // --- [Step 2-1] 지리적 클러스터링: 가까운 장소들을 먼저 그룹화 ---
+    const CLUSTER_DISTANCE_THRESHOLD = 5; // 5km 이내의 장소들을 같은 클러스터로 묶음
+    const clusters = [];
+    const assignedToCluster = new Set();
     
-    const clusteredPlaces = places.map(place => {
+    // 각 장소에 대해 클러스터 찾기 또는 생성
+    places.forEach((place, idx) => {
+      if (assignedToCluster.has(idx)) return;
+      
+      const cluster = [place];
+      assignedToCluster.add(idx);
+      
+      // 현재 장소와 가까운 다른 장소들 찾기
+      places.forEach((otherPlace, otherIdx) => {
+        if (idx === otherIdx || assignedToCluster.has(otherIdx)) return;
+        const dist = getDist(place, otherPlace);
+        if (dist <= CLUSTER_DISTANCE_THRESHOLD) {
+          cluster.push(otherPlace);
+          assignedToCluster.add(otherIdx);
+        }
+      });
+      
+      // 클러스터 중심점 계산
+      const centerLat = cluster.reduce((sum, p) => sum + p.lat, 0) / cluster.length;
+      const centerLng = cluster.reduce((sum, p) => sum + p.lng, 0) / cluster.length;
+      
+      clusters.push({
+        places: cluster,
+        center: { lat: centerLat, lng: centerLng },
+        size: cluster.length
+      });
+    });
+    
+    console.log(`📍 지리적 클러스터링 완료: ${clusters.length}개 클러스터 생성 (${places.length}개 장소)`);
+    
+    // --- [Step 2-2] 클러스터를 일차에 배정 (거리 우선, 균등 분배 고려) ---
+    const dayCounts = Array(totalDays).fill(0); // 각 날짜별 배정된 장소 수 추적
+    const clusteredPlaces = [];
+    
+    // 클러스터를 크기 순으로 정렬 (큰 클러스터부터 배정)
+    clusters.sort((a, b) => b.size - a.size);
+    
+    clusters.forEach(cluster => {
       let bestDay = 0;
       let bestScore = -Infinity;
 
       dayInfo.forEach((info, index) => {
         if (info.location) {
-          const dist = getDist(info.location, place);
+          const dist = getDist(info.location, cluster.center);
           
           // 점수 계산: 거리가 가까울수록 + 장소가 적을수록 높은 점수
-          // - 거리: km당 -10점
-          // - 균등 분배: 이미 배정된 장소 1개당 -50점 (균등 분배 우선)
-          const distanceScore = -dist * 10;
-          const balanceScore = -dayCounts[index] * 50;
+          // - 거리: km당 -30점 (가중치 증가: 거리 우선)
+          // - 균등 분배: 이미 배정된 장소 1개당 -20점 (가중치 감소: 균등 분배는 보조)
+          const distanceScore = -dist * 30; // 거리 가중치 증가
+          const balanceScore = -dayCounts[index] * 20; // 균등 분배 가중치 감소
           const totalScore = distanceScore + balanceScore;
           
           if (totalScore > bestScore) {
@@ -2097,9 +2326,13 @@ const TripPlanPageEx1 = () => {
         }
       });
       
-      dayCounts[bestDay]++; // 배정된 날짜의 카운트 증가
+      // 클러스터 내 모든 장소를 같은 일차에 배정
+      cluster.places.forEach(place => {
+        clusteredPlaces.push({ ...place, assignedDay: bestDay });
+        dayCounts[bestDay]++;
+      });
       
-      return { ...place, assignedDay: bestDay };
+      console.log(`✅ 클러스터 (${cluster.places.length}개 장소) → ${bestDay + 1}일차 배정 (거리: ${getDist(dayInfo[bestDay].location, cluster.center).toFixed(1)}km)`);
     });
 
     // --- [Step 3] 일차별 동선 최적화 (Nearest Neighbor + 카테고리 밸런싱) ---
@@ -2799,6 +3032,9 @@ const TripPlanPageEx1 = () => {
 
   // 일정 표시 모드 (step 4 - 일정 생성 후)
   const ScheduleDisplayMode = () => {
+    // 일자별 색상 정의 (마커와 동일)
+    const dayColors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+    
     // 총 여행 일수 계산
     const getTotalDays = () => {
       if (!startDate || !endDate) return 0;
@@ -2807,20 +3043,27 @@ const TripPlanPageEx1 = () => {
       return diffDays;
     };
 
-    // 필터링된 장소 및 숙소 (선택된 날짜에 따라)
-    const getFilteredPlaces = () => {
+    // 필터링된 장소 및 숙소 (선택된 날짜에 따라) - useMemo로 최적화
+    const filteredPlaces = useMemo(() => {
       if (selectedDayView === 'all') {
-        // 전체 일정: 모든 날짜의 장소를 평면화
-        return distributedSchedule.flat();
+        // 전체 일정: 모든 날짜의 장소를 평면화하되 일차 정보 포함
+        const allPlaces = [];
+        distributedSchedule.forEach((dayPlaces, dayIndex) => {
+          dayPlaces.forEach((place) => {
+            allPlaces.push({ ...place, dayIndex });
+          });
+        });
+        return allPlaces;
       }
-      // 특정 날짜 선택 시 해당 날짜의 장소만 표시
-      return distributedSchedule[selectedDayView] || [];
-    };
+      // 특정 날짜 선택 시 해당 날짜의 장소만 표시 (일차 정보 포함)
+      const dayPlaces = distributedSchedule[selectedDayView] || [];
+      return dayPlaces.map(place => ({ ...place, dayIndex: selectedDayView }));
+    }, [distributedSchedule, selectedDayView]);
 
-    const getFilteredAccommodations = () => {
+    const filteredAccommodations = useMemo(() => {
       if (selectedDayView === 'all') return selectedAccommodations;
       return selectedAccommodations.filter(acc => acc.dayIndex === selectedDayView);
-    };
+    }, [selectedAccommodations, selectedDayView]);
 
     return (
       <div className="relative w-full h-screen">
@@ -2829,8 +3072,8 @@ const TripPlanPageEx1 = () => {
           <DirectSearchMap
             centerLat={selectedDestination.lat}
             centerLng={selectedDestination.lng}
-            selectedPlaces={getFilteredPlaces()}
-            selectedAccommodations={getFilteredAccommodations()}
+            selectedPlaces={filteredPlaces}
+            selectedAccommodations={filteredAccommodations}
             selectedDayView={selectedDayView}
           />
         </div>
@@ -2968,7 +3211,10 @@ const TripPlanPageEx1 = () => {
                       <div key={dayIndex} className="flex-shrink-0 w-[380px] bg-gray-50 rounded-xl p-4 border border-gray-200">
                         {/* 날짜 헤더 */}
                         <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-300">
-                          <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-base font-bold">
+                          <div 
+                            className="w-10 h-10 rounded-full text-white flex items-center justify-center text-base font-bold"
+                            style={{ backgroundColor: dayColors[dayIndex] || '#2563eb' }}
+                          >
                             {dayIndex + 1}
                           </div>
                           <div>
@@ -3081,13 +3327,13 @@ const TripPlanPageEx1 = () => {
             ) : (
               // 특정 날짜 일정 표시
               <div className="p-6 space-y-4">
-                {getFilteredPlaces().length === 0 ? (
+                {filteredPlaces.length === 0 ? (
                   <div className="text-center text-gray-400 py-12">
                     <div className="text-lg mb-2">📅</div>
                     <div>이 날짜에 배정된 장소가 없습니다</div>
                   </div>
                 ) : (
-                  getFilteredPlaces().map((place, placeIndex) => (
+                  filteredPlaces.map((place, placeIndex) => (
                   <div key={place.id}>
                     <div className="flex gap-4 p-4 bg-white border border-gray-200 rounded-xl hover:shadow-lg transition-shadow">
                       <img
@@ -3113,8 +3359,8 @@ const TripPlanPageEx1 = () => {
                     </div>
 
                     {/* 이동 시간 */}
-                    {placeIndex < getFilteredPlaces().length - 1 && (() => {
-                      const nextPlace = getFilteredPlaces()[placeIndex + 1];
+                    {placeIndex < filteredPlaces.length - 1 && (() => {
+                      const nextPlace = filteredPlaces[placeIndex + 1];
                       return (
                         <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3132,10 +3378,10 @@ const TripPlanPageEx1 = () => {
                 )))}
 
                 {/* 마지막 장소 → 숙소 이동 시간 */}
-                {getFilteredAccommodations().length > 0 && getFilteredPlaces().length > 0 && (() => {
-                  const places = getFilteredPlaces();
+                {filteredAccommodations.length > 0 && filteredPlaces.length > 0 && (() => {
+                  const places = filteredPlaces;
                   const lastPlace = places[places.length - 1];
-                  const accommodation = getFilteredAccommodations()[0];
+                  const accommodation = filteredAccommodations[0];
                   return (
                     <div className="flex items-center gap-2 py-3 text-sm text-gray-500 ml-3">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3151,7 +3397,7 @@ const TripPlanPageEx1 = () => {
                 })()}
 
                 {/* 숙소 */}
-                {getFilteredAccommodations().map(acc => (
+                {filteredAccommodations.map(acc => (
                   <div key={acc.accommodation.id} className="flex gap-4 p-4 bg-green-50 border border-green-200 rounded-xl">
                     <img
                       src={acc.accommodation.image}
@@ -3193,6 +3439,8 @@ const TripPlanPageEx1 = () => {
     setShowEditPanel,
     TravelTimeDisplay
   }) => {
+    // 일자별 색상 정의 (마커와 동일)
+    const dayColors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
 
     // 장소 삭제
     const handleDeletePlace = async (dayIndex, placeIndex) => {
@@ -3318,7 +3566,10 @@ const TripPlanPageEx1 = () => {
                 return (
                   <div key={dayIndex} className="flex-shrink-0 w-[380px] bg-gray-50 rounded-xl p-4 border border-gray-200">
                     <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-300">
-                      <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-base font-bold">
+                      <div 
+                        className="w-10 h-10 rounded-full text-white flex items-center justify-center text-base font-bold"
+                        style={{ backgroundColor: dayColors[dayIndex] || '#2563eb' }}
+                      >
                         {dayIndex + 1}
                       </div>
                       <div>
@@ -4088,6 +4339,7 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
   const mapRefInstance = React.useRef(null);
   const markersRef = React.useRef([]);
   const polylineRef = React.useRef(null);
+  const polylinesRef = React.useRef([]); // 전체 일정용 여러 선 저장
   const [mapReady, setMapReady] = React.useState(false);
 
   // 지도 초기화는 한 번만 실행 (centerLat, centerLng 변경 시 재생성 방지)
@@ -4164,6 +4416,14 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
       polylineRef.current.setMap(null);
       polylineRef.current = null;
     }
+    
+    // 전체 일정용 여러 선 제거
+    if (polylinesRef.current) {
+      polylinesRef.current.forEach((p) => {
+        if (p && p.setMap) p.setMap(null);
+      });
+      polylinesRef.current = [];
+    }
 
     const maps = window.google.maps;
     const selectedPlacesList = Array.isArray(selectedPlaces) ? selectedPlaces : [];
@@ -4177,8 +4437,9 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
         const pos = { lat: place.lat, lng: place.lng };
         const markerNumber = index + 1;
         
-        // 선택된 날짜가 'all'이면 모든 장소에 파란색, 아니면 해당 날짜 색상
-        const markerColor = selectedDayView === 'all' ? '#2563eb' : (dayColors[selectedDayView] || '#2563eb');
+        // 선택된 날짜가 'all'이면 각 장소의 일차에 맞는 색상 사용, 아니면 해당 날짜 색상
+        const dayIndex = selectedDayView === 'all' ? (place.dayIndex !== undefined ? place.dayIndex : 0) : selectedDayView;
+        const markerColor = dayColors[dayIndex] || '#2563eb';
         
         try {
           // 번호가 표시된 커스텀 마커 생성
@@ -4254,37 +4515,91 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
 
     // 장소들을 순서대로 선으로 연결 + 마지막 장소에서 숙소로 연결
     if (selectedPlacesList.length > 0) {
-      const pathCoordinates = [];
-      
-      // 장소들 좌표 추가
-      selectedPlacesList.forEach((place) => {
-        if (typeof place.lat === 'number' && typeof place.lng === 'number') {
-          pathCoordinates.push({ lat: place.lat, lng: place.lng });
-        }
-      });
-
-      // 마지막 장소 → 숙소 연결 (selectedDayView가 'all'이 아닐 때만)
-      if (selectedDayView !== 'all' && typeof selectedDayView === 'number') {
-        const dayAccommodation = accommodationsList.find(acc => acc.dayIndex === selectedDayView);
-        if (dayAccommodation && dayAccommodation.accommodation.lat && dayAccommodation.accommodation.lng) {
-          pathCoordinates.push({ 
-            lat: dayAccommodation.accommodation.lat, 
-            lng: dayAccommodation.accommodation.lng 
-          });
-        }
-      }
-
-      if (pathCoordinates.length > 1) {
-        const lineColor = selectedDayView === 'all' ? '#2563eb' : (dayColors[selectedDayView] || '#2563eb');
+      if (selectedDayView === 'all') {
+        // 전체 일정: 각 일차별로 다른 색상의 선 그리기
+        const dayGroups = {};
         
-        polylineRef.current = new maps.Polyline({
-          path: pathCoordinates,
-          geodesic: true,
-          strokeColor: lineColor,
-          strokeOpacity: 0.8,
-          strokeWeight: 3,
+        // 일차별로 장소 그룹화
+        selectedPlacesList.forEach((place) => {
+          const dayIdx = place.dayIndex !== undefined ? place.dayIndex : 0;
+          if (!dayGroups[dayIdx]) {
+            dayGroups[dayIdx] = [];
+          }
+          if (typeof place.lat === 'number' && typeof place.lng === 'number') {
+            dayGroups[dayIdx].push({ lat: place.lat, lng: place.lng });
+          }
         });
-        polylineRef.current.setMap(mapRefInstance.current);
+        
+        // 각 일차별로 선 그리기
+        Object.keys(dayGroups).forEach((dayIdx) => {
+          const dayPlaces = dayGroups[dayIdx];
+          if (dayPlaces.length > 1) {
+            const dayIndex = parseInt(dayIdx);
+            const lineColor = dayColors[dayIndex] || '#2563eb';
+            
+            const polyline = new maps.Polyline({
+              path: dayPlaces,
+              geodesic: true,
+              strokeColor: lineColor,
+              strokeOpacity: 0.8,
+              strokeWeight: 3,
+            });
+            polyline.setMap(mapRefInstance.current);
+            polylinesRef.current.push(polyline);
+          }
+          
+          // 마지막 장소 → 숙소 연결
+          const dayIndexNum = parseInt(dayIdx);
+          const dayAccommodation = accommodationsList.find(acc => acc.dayIndex === dayIndexNum);
+          if (dayAccommodation && dayAccommodation.accommodation.lat && dayAccommodation.accommodation.lng && dayPlaces.length > 0) {
+            const accPolyline = new maps.Polyline({
+              path: [
+                dayPlaces[dayPlaces.length - 1],
+                { lat: dayAccommodation.accommodation.lat, lng: dayAccommodation.accommodation.lng }
+              ],
+              geodesic: true,
+              strokeColor: '#84cc16', // 숙소 연결은 연두색
+              strokeOpacity: 0.6,
+              strokeWeight: 2,
+            });
+            accPolyline.setMap(mapRefInstance.current);
+            polylinesRef.current.push(accPolyline);
+          }
+        });
+      } else {
+        // 특정 일차 선택: 하나의 선으로 연결
+        const pathCoordinates = [];
+        
+        // 장소들 좌표 추가
+        selectedPlacesList.forEach((place) => {
+          if (typeof place.lat === 'number' && typeof place.lng === 'number') {
+            pathCoordinates.push({ lat: place.lat, lng: place.lng });
+          }
+        });
+
+        // 마지막 장소 → 숙소 연결
+        if (typeof selectedDayView === 'number') {
+          const dayAccommodation = accommodationsList.find(acc => acc.dayIndex === selectedDayView);
+          if (dayAccommodation && dayAccommodation.accommodation.lat && dayAccommodation.accommodation.lng) {
+            pathCoordinates.push({ 
+              lat: dayAccommodation.accommodation.lat, 
+              lng: dayAccommodation.accommodation.lng 
+            });
+          }
+        }
+
+        if (pathCoordinates.length > 1) {
+          const lineColor = dayColors[selectedDayView] || '#2563eb';
+          
+          polylineRef.current = new maps.Polyline({
+            path: pathCoordinates,
+            geodesic: true,
+            strokeColor: lineColor,
+            strokeOpacity: 0.8,
+            strokeWeight: 3,
+          });
+          polylineRef.current.setMap(mapRefInstance.current);
+        }
       }
     }
 
@@ -4309,7 +4624,8 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
       }
     });
     
-    if (validCoords > 0) {
+    // 유효한 좌표가 있고 bounds가 비어있지 않은 경우에만 지도 업데이트
+    if (validCoords > 0 && !bounds.isEmpty()) {
       // 장소가 1개일 경우
       if (validCoords === 1) {
         const center = bounds.getCenter();
@@ -4338,13 +4654,24 @@ function DirectSearchMap({ centerLat, centerLng, selectedPlaces, selectedAccommo
         }
       } else {
         // 2개 이상일 경우 범위 조정 후 중심 이동
-        mapRefInstance.current.fitBounds(bounds, {
-          top: 50,
-          right: 50,
-          bottom: 50,
-          left: 1000 // 왼쪽에 더 큰 패딩 (일자패널 100px + 일정패널 850px + 여유 50px)
-        });
+        try {
+          mapRefInstance.current.fitBounds(bounds, {
+            top: 50,
+            right: 50,
+            bottom: 50,
+            left: 1000 // 왼쪽에 더 큰 패딩 (일자패널 100px + 일정패널 850px + 여유 50px)
+          });
+        } catch (error) {
+          // bounds가 유효하지 않은 경우 (예: 모든 좌표가 같을 때) 중심점으로 설정
+          console.warn('fitBounds 실패, 중심점으로 설정:', error);
+          const center = bounds.getCenter();
+          mapRefInstance.current.setCenter(center);
+          mapRefInstance.current.setZoom(12);
+        }
       }
+    } else if (validCoords === 0) {
+      // 좌표가 없는 경우 기본 중심점 유지 (지도 초기화 방지)
+      // 아무것도 하지 않음 - 이전 상태 유지
     }
   }, [selectedPlaces, selectedAccommodations, selectedDayView, mapId, mapReady]);
 

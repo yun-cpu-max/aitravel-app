@@ -216,7 +216,7 @@ const DashboardPage = () => {
             </div>
             <Link
               to="/trip-plan-ex1"
-              className="bg-black hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
+              className="bg-sky-500 hover:bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200"
             >
               새 여행 계획하기
             </Link>
@@ -290,18 +290,12 @@ const DashboardPage = () => {
                     <p>여행 목록: {trip.totalItineraryItemsCount ?? 0}개</p>
                   </div>
                   {/* 액션 버튼 */}
-                  <div className="mt-6 flex space-x-3">
+                  <div className="mt-6">
                     <button
                       onClick={() => navigate(`/trip-detail/${trip.id}`)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-center py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
+                      className="w-full bg-sky-500 hover:bg-gray-800 text-white text-center py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
                     >
                       상세보기
-                    </button>
-                    <button 
-                      onClick={() => navigate(`/trip-plan-ex1?tripId=${trip.id}`)}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-2 px-4 rounded-lg text-sm font-medium transition-colors duration-200"
-                    >
-                      수정하기
                     </button>
                   </div>
                 </div>
