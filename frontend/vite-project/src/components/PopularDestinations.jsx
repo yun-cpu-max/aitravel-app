@@ -621,7 +621,7 @@ const PopularDestinations = () => {
 
   if (loading) {
     return (
-      <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+      <section id="popular-destinations" className="py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>
@@ -636,7 +636,7 @@ const PopularDestinations = () => {
   }
 
   return (
-    <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+    <section id="popular-destinations" className="py-20 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-8">
           <h2 className="text-4xl font-bold text-gray-800 mb-3">인기 여행지</h2>

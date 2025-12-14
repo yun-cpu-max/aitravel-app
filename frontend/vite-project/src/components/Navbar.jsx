@@ -52,6 +52,30 @@ const Navbar = ({ onOpenModal }) => {
       navigate('/login', { state: { from: '/trip-plan-ex1' } });
     }
   };
+
+  /**
+   * 여행지 버튼 클릭 핸들러
+   * - 홈페이지로 이동하고 인기 여행지 섹션으로 스크롤
+   */
+  const handleDestinations = () => {
+    // 현재 경로가 홈페이지가 아니면 홈페이지로 이동
+    if (window.location.pathname !== '/') {
+      navigate('/');
+      // 페이지 이동 후 스크롤 (약간의 지연 필요)
+      setTimeout(() => {
+        const element = document.getElementById('popular-destinations');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else {
+      // 이미 홈페이지에 있으면 바로 스크롤
+      const element = document.getElementById('popular-destinations');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       {/* max-w-7xl -> max-w-full로 변경 */}
@@ -70,6 +94,14 @@ const Navbar = ({ onOpenModal }) => {
           {/* 링크 및 버튼 영역 */}
           <div className="block">
             <div className="ml-6 flex items-center space-x-4">
+              {/* 여행지 버튼 */}
+              <button
+                onClick={handleDestinations}
+                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-bold transition-colors duration-200"
+              >
+                여행지
+              </button>
+              
               {/* 이용 방법 버튼 */}
               <button
                 onClick={onOpenModal}
