@@ -29,30 +29,34 @@ export const AuthProvider = ({ children }) => {
 
   /**
    * 컴포넌트 마운트 시 실행되는 useEffect
-   * - localStorage에서 저장된 사용자 정보를 로드
-   * - 앱 시작 시 이전 로그인 상태를 복원
+   * - sessionStorage에 세션 마커를 두고, 없으면 "서버 재시작"으로 간주하여 로그인 초기화
+   * - localStorage의 사용자 정보는 새로고침/탭 닫기-열기에도 유지
    */
   useEffect(() => {
-    /**
-     * localStorage에서 사용자 정보를 로드하는 함수
-     * - 저장된 사용자 정보가 있으면 state에 설정
-     * - 오류 발생 시 localStorage를 정리하고 로그 출력
-     */
-    const loadUser = () => {
+    const initializeAuth = () => {
       try {
+        // 세션 마커 확인: 없으면 서버가 새로 시작되었다고 간주
+        const sessionMarker = sessionStorage.getItem('server_session_marker');
+        if (!sessionMarker) {
+          // 서버 재시작: 로그인 초기화
+          localStorage.removeItem('user');
+          sessionStorage.setItem('server_session_marker', String(Date.now()));
+        }
+
+        // 사용자 정보 복원 (브라우저 새로고침/탭 닫기-열기 시 유지)
         const savedUser = localStorage.getItem('user');
         if (savedUser) {
           setUser(JSON.parse(savedUser));
         }
       } catch (error) {
-        console.error('사용자 정보 로드 실패:', error);
+        console.error('인증 초기화 실패:', error);
         localStorage.removeItem('user');
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadUser();
+    initializeAuth();
   }, []);
 
   /**
@@ -69,14 +73,17 @@ export const AuthProvider = ({ children }) => {
    */
   const login = async (userData) => {
     try {
-      // TODO: 실제 OAuth 로그인 API 호출
-      // 임시로 사용자 데이터를 저장
+      // 실제 백엔드에서 받은 사용자 데이터 사용
       const userInfo = {
-        id: Date.now().toString(),
+        id: userData.id || Date.now().toString(), // 백엔드에서 받은 실제 ID 사용
         name: userData.name || '사용자',
         email: userData.email || 'user@example.com',
-        profileImage: userData.profileImage || null,
-        provider: userData.provider || 'google', // google, kakao, naver
+        profileImage: userData.profileImage || userData.profileImageUrl || null,
+        provider: userData.provider || 'local',
+        providerId: userData.providerId || null,
+        token: userData.token || null,
+        createdAt: userData.createdAt || new Date().toISOString(),
+        updatedAt: userData.updatedAt || new Date().toISOString(),
         loginTime: new Date().toISOString(),
         travelPreferences: {
           type: '',
@@ -153,10 +160,15 @@ export const AuthProvider = ({ children }) => {
   /**
    * 사용자 인증 상태 확인 함수
    * - 현재 사용자가 로그인되어 있는지 확인
+   * - 로딩 중일 때는 false를 반환하여 로그인 페이지로 리다이렉트 방지
    * 
    * @returns {boolean} 로그인 상태 (true: 로그인됨, false: 로그인 안됨)
    */
   const isAuthenticated = () => {
+    // 로딩 중이면 false 반환 (로그인 페이지로 리다이렉트 방지)
+    if (isLoading) {
+      return false;
+    }
     return user !== null;
   };
 

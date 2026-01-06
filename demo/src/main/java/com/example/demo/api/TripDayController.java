@@ -85,7 +85,9 @@ public class TripDayController {
         day.setTrip(trip);
         day.setDayNumber(req.dayNumber);
         day.setDate(req.date);
-        day.setWeatherInfo(req.weatherInfo);
+        day.setDayStartTime(req.dayStartTime);
+        day.setDayEndTime(req.dayEndTime);
+        day.setAccommodationJson(req.accommodationJson);
         
         // 일차 저장 및 반환
         TripDay saved = tripDayRepository.save(day);
@@ -112,7 +114,9 @@ public class TripDayController {
         // 일차 정보 업데이트
         day.setDayNumber(req.dayNumber);
         day.setDate(req.date);
-        day.setWeatherInfo(req.weatherInfo);
+        day.setDayStartTime(req.dayStartTime);
+        day.setDayEndTime(req.dayEndTime);
+        day.setAccommodationJson(req.accommodationJson);
         
         // 일차 저장 및 반환
         TripDay saved = tripDayRepository.save(day);
@@ -146,7 +150,9 @@ public class TripDayController {
         r.id = day.getId();
         r.dayNumber = day.getDayNumber();
         r.date = day.getDate();
-        r.weatherInfo = day.getWeatherInfo();
+        r.dayStartTime = day.getDayStartTime();
+        r.dayEndTime = day.getDayEndTime();
+        r.accommodationJson = day.getAccommodationJson();
         return r;
     }
 }

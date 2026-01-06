@@ -39,13 +39,26 @@ public class User {
     /**
      * @Column: 컬럼명을 password_hash로 지정
      * 실제 DB에는 해시된 비밀번호만 저장 (보안)
+     * nullable = true: OAuth 로그인 사용자는 비밀번호가 없음
      */
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", nullable = true, length = 255)
     private String passwordHash;
 
     /** 사용자 표시 이름 (실제 이름) */
     @Column(nullable = false, length = 100)
     private String name;
+
+    /** 소셜 로그인 제공자 (예: "google", "kakao", "naver") */
+    @Column(length = 50)
+    private String provider;
+
+    /** 소셜 로그인 제공자에서의 사용자 ID */
+    @Column(name = "provider_id", length = 100)
+    private String providerId;
+
+    /** 프로필 이미지 URL */
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
 
     /**
      * @OneToMany: 1:N 관계 매핑 (한 사용자 : 여러 여행)
@@ -90,6 +103,12 @@ public class User {
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+    public String getProvider() { return provider; }
+    public void setProvider(String provider) { this.provider = provider; }
+    public String getProviderId() { return providerId; }
+    public void setProviderId(String providerId) { this.providerId = providerId; }
+    public String getProfileImageUrl() { return profileImageUrl; }
+    public void setProfileImageUrl(String profileImageUrl) { this.profileImageUrl = profileImageUrl; }
     public List<Trip> getTrips() { return trips; }
     public void setTrips(List<Trip> trips) { this.trips = trips; }
     public LocalDateTime getCreatedAt() { return createdAt; }

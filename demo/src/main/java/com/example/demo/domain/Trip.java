@@ -7,8 +7,11 @@ package com.example.demo.domain;
  */
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @Entity: JPA 엔티티임을 표시. 데이터베이스 테이블과 매핑되는 클래스
@@ -42,6 +45,18 @@ public class Trip {
     /** 대표 여행지 (주요 도시명, 예: "파리", "제주도") */
     @Column(nullable = false, length = 100)
     private String destination;
+
+    /** Google Place ID (여행지 고유 식별자) */
+    @Column(name = "destination_place_id", length = 255)
+    private String destinationPlaceId;
+
+    /** 여행지 위도 (지도 중심점) */
+    @Column(name = "destination_lat", precision = 10, scale = 8)
+    private BigDecimal destinationLat;
+
+    /** 여행지 경도 (지도 중심점) */
+    @Column(name = "destination_lng", precision = 11, scale = 8)
+    private BigDecimal destinationLng;
 
     /** 여행 시작 일자 (출발일) */
     @Column(name = "start_date", nullable = false)
@@ -80,6 +95,14 @@ public class Trip {
     /** 마지막 수정 시각 (자동 갱신) */
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /**
+     * @OneToMany: 1:N 관계 매핑 (한 여행 : 여러 일차)
+     * cascade = CascadeType.ALL: Trip 삭제 시 TripDay도 자동 삭제
+     * orphanRemoval = true: 연결이 끊어진 TripDay 자동 삭제
+     */
+    @OneToMany(mappedBy = "trip", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TripDay> tripDays = new ArrayList<>();
 
     /**
      * @PrePersist: 엔티티가 DB에 저장되기 전에 실행되는 메소드
@@ -121,6 +144,14 @@ public class Trip {
     public void setStatus(String status) { this.status = status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public String getDestinationPlaceId() { return destinationPlaceId; }
+    public void setDestinationPlaceId(String destinationPlaceId) { this.destinationPlaceId = destinationPlaceId; }
+    public BigDecimal getDestinationLat() { return destinationLat; }
+    public void setDestinationLat(BigDecimal destinationLat) { this.destinationLat = destinationLat; }
+    public BigDecimal getDestinationLng() { return destinationLng; }
+    public void setDestinationLng(BigDecimal destinationLng) { this.destinationLng = destinationLng; }
+    public List<TripDay> getTripDays() { return tripDays; }
+    public void setTripDays(List<TripDay> tripDays) { this.tripDays = tripDays; }
 }
 
 

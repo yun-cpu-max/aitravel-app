@@ -20,11 +20,40 @@ public class UserDtos {
         public String name;
     }
 
+    public static class SocialLoginReq {
+        @NotBlank(message = "email은 필수입니다.")
+        public String email;
+
+        @NotBlank(message = "name은 필수입니다.")
+        public String name;
+
+        @NotBlank(message = "provider는 필수입니다.")
+        public String provider; // google, kakao, naver
+
+        @NotBlank(message = "providerId는 필수입니다.")
+        public String providerId;
+
+        public String profileImageUrl;
+    }
+
+    public static class UpdateReq {
+        @NotBlank(message = "name은 필수입니다.")
+        public String name;
+
+        @Email(message = "올바른 이메일 형식이어야 합니다.")
+        @NotBlank(message = "email은 필수입니다.")
+        public String email;
+    }
+
     public static class Resp {
         public Long id;
         public String email;
         public String name;
+        public String provider;
+        public String providerId;
+        public String profileImageUrl;
         public LocalDateTime createdAt;
+        public LocalDateTime updatedAt;
     }
 }
 

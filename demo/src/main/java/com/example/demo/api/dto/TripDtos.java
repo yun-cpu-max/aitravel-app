@@ -4,7 +4,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /** Trip 요청/응답 DTO */
 public class TripDtos {
@@ -14,6 +16,9 @@ public class TripDtos {
         public String title;
         @NotBlank(message = "destination은 필수입니다.")
         public String destination;
+        public String destinationPlaceId; // Google Place ID
+        public BigDecimal destinationLat; // 여행지 위도
+        public BigDecimal destinationLng; // 여행지 경도
         @NotNull(message = "startDate는 필수입니다.")
         public LocalDate startDate;
         @NotNull(message = "endDate는 필수입니다.")
@@ -23,18 +28,42 @@ public class TripDtos {
         @Min(value = 0, message = "아동은 0 이상이어야 합니다.")
         public Integer numChildren = 0;
         public Integer totalBudget;
+        public List<TripDayDtos.CreateOrUpdateReq> days; // 일차별 정보
     }
 
+    /** 상세 응답 DTO (일차/일정 수 포함, 상세보기용) */
     public static class Resp {
         public Long id;
         public String title;
         public String destination;
+        public String destinationPlaceId;
+        public BigDecimal destinationLat;
+        public BigDecimal destinationLng;
         public LocalDate startDate;
         public LocalDate endDate;
         public Integer numAdults;
         public Integer numChildren;
         public Integer totalBudget;
         public String status;
+        public Long userId; // 사용자 ID (필터링용)
+        public Integer daysCount; // 일차 수
+        public Integer totalItineraryItemsCount; // 전체 일정 항목 수
+        public List<TripDayDtos.Resp> days; // 각 일차 상세 정보 (상세 보기용)
+    }
+
+    /** 대시보드용 간단 응답 DTO (trips 테이블 컬럼 + 일수/일정 개수 집계) */
+    public static class SimpleResp {
+        public Long id;
+        public String title;
+        public String destination;
+        public String destinationPlaceId;
+        public LocalDate startDate;
+        public LocalDate endDate;
+        public Integer numAdults;
+        public Integer numChildren;
+        public String status;
+        public Integer daysCount; // 여행 일차 수
+        public Integer totalItineraryItemsCount; // 전체 일정 항목 수
     }
 }
 

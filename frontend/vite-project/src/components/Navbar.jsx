@@ -38,6 +38,44 @@ const Navbar = ({ onOpenModal }) => {
     logout();
     navigate('/');
   };
+
+  /**
+   * 여행 계획하기 버튼 클릭 핸들러
+   * - 로그인 상태 확인 후 여행 계획 페이지로 이동
+   * - 로그인하지 않았으면 로그인 페이지로 리다이렉트
+   */
+  const handleTripPlan = () => {
+    if (isAuthenticated()) {
+      navigate('/trip-plan-ex1');
+    } else {
+      // 로그인 후 여행 계획 페이지로 돌아올 수 있도록 state 전달
+      navigate('/login', { state: { from: '/trip-plan-ex1' } });
+    }
+  };
+
+  /**
+   * 여행지 버튼 클릭 핸들러
+   * - 홈페이지로 이동하고 인기 여행지 섹션으로 스크롤
+   */
+  const handleDestinations = () => {
+    // 현재 경로가 홈페이지가 아니면 홈페이지로 이동
+    if (window.location.pathname !== '/') {
+      navigate('/');
+      // 페이지 이동 후 스크롤 (약간의 지연 필요)
+      setTimeout(() => {
+        const element = document.getElementById('popular-destinations');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    } else {
+      // 이미 홈페이지에 있으면 바로 스크롤
+      const element = document.getElementById('popular-destinations');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+  };
   return (
     <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       {/* max-w-7xl -> max-w-full로 변경 */}
@@ -46,9 +84,9 @@ const Navbar = ({ onOpenModal }) => {
           {/* 로고 영역 */}
           <div className="flex items-center">
             <Link to="/" className="flex-shrink-0 flex items-center space-x-3 hover:opacity-80 transition-opacity">
-              <img src="/logo.png" alt="스마트 여행 플래너" className="h-10 sm:h-11 md:h-12 w-auto object-contain" />
-              <h1 className="text-2xl font-bold text-blue-600">
-                스마트 여행 플래너
+              <img src="/logo.png" alt="스마트 여행 플래너" className="w-10 h-10 rounded-md" />
+              <h1 className="text-2xl font-bold text-sky-400">
+                여행 플래너
               </h1>
             </Link>
           </div>
@@ -56,21 +94,29 @@ const Navbar = ({ onOpenModal }) => {
           {/* 링크 및 버튼 영역 */}
           <div className="block">
             <div className="ml-6 flex items-center space-x-4">
+              {/* 여행지 버튼 */}
+              <button
+                onClick={handleDestinations}
+                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-bold transition-colors duration-200"
+              >
+                여행지
+              </button>
+              
               {/* 이용 방법 버튼 */}
               <button
                 onClick={onOpenModal}
-                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
+                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-bold transition-colors duration-200"
               >
                 이용 방법
               </button>
               
               {/* 여행 계획하기 버튼 */}
-              <Link
-                to="/trip-plan"
-                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
+              <button
+                onClick={handleTripPlan}
+                className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-bold transition-colors duration-200"
               >
                 여행 계획하기
-              </Link>
+              </button>
 
               {/* 인증 상태에 따른 버튼 표시 */}
               {isAuthenticated() ? (
@@ -94,6 +140,12 @@ const Navbar = ({ onOpenModal }) => {
                       >
                         나의 여행 대시보드
                       </Link>
+                      {/* <Link
+                        to="/archive/demo-trip-1"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        여행 아카이브
+                      </Link> */}
                       <Link
                         to="/profile"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -113,7 +165,7 @@ const Navbar = ({ onOpenModal }) => {
                 <>
                   <Link
                     to="/login"
-                    className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-medium transition-colors duration-200"
+                    className="text-black hover:text-blue-600 px-3 py-2 rounded-md text-lg font-bold transition-colors duration-200"
                   >
                     로그인
                   </Link>

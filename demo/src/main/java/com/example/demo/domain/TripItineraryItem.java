@@ -35,6 +35,10 @@ public class TripItineraryItem {
     @JoinColumn(name = "trip_day_id")
     private TripDay tripDay;
 
+    /** Google Place ID (장소 고유 식별자) */
+    @Column(name = "place_id", length = 255)
+    private String placeId;
+
     /** 일정 제목 (예: "에펠탑 관광", "맛집 점심") */
     @Column(nullable = false, length = 200)
     private String title;
@@ -46,6 +50,10 @@ public class TripItineraryItem {
     /** 장소명 (예: "에펠탑", "카페 드 플뢰르") */
     @Column(name = "location_name", length = 200)
     private String locationName;
+
+    /** 주소 (예: "Champ de Mars, 5 Avenue Anatole France, 75007 Paris") */
+    @Column(columnDefinition = "TEXT")
+    private String address;
 
     /**
      * 위도 (정밀도: 소수점 8자리까지)
@@ -69,43 +77,43 @@ public class TripItineraryItem {
     /** 종료 시간 (예: 11:30) */
     private LocalTime endTime;
 
-    /** 예상 비용 (원 단위) */
-    @Column(name = "estimated_cost")
-    private Integer estimatedCost;
-
-    /** 카테고리 (예: "관광", "식사", "쇼핑", "교통") */
+    /** 카테고리 (예: "tourist_attraction", "restaurant", "cafe") */
     @Column(length = 50)
     private String category;
 
-    /** 이동 수단 (예: "지하철", "택시", "도보", "버스") */
-    @Column(name = "transportation_type", length = 50)
-    private String transportationType;
+    /** 예상 체류 시간 (분) */
+    @Column(name = "stay_duration_minutes")
+    private Integer stayDurationMinutes;
 
-    /** 이동 소요 시간 (분 단위) */
-    @Column(name = "transportation_duration")
-    private Integer transportationDuration;
+    /** 다음 장소까지의 거리 (km) */
+    @Column(name = "travel_to_next_distance_km", precision = 10, scale = 2)
+    private BigDecimal travelToNextDistanceKm;
 
-    /** 이동 비용 (원 단위) */
-    @Column(name = "transportation_cost")
-    private Integer transportationCost;
+    /** 다음 장소까지의 이동 소요 시간 (분) */
+    @Column(name = "travel_to_next_duration_minutes")
+    private Integer travelToNextDurationMinutes;
+
+    /** 다음 장소까지의 이동 수단 (예: "DRIVE", "TRANSIT", "WALK") */
+    @Column(name = "travel_to_next_mode", length = 20)
+    private String travelToNextMode;
 
     /** 일정 순서 (같은 일차 내에서의 순서) */
     @Column(name = "order_sequence", nullable = false)
     private Integer orderSequence;
-
-    /** 확정 여부 (기본값: false, 사용자가 확정했는지 여부) */
-    @Column(name = "is_confirmed")
-    private Boolean isConfirmed = false;
 
     public Long getId() { return id; }
     public TripDay getTripDay() { return tripDay; }
     public void setTripDay(TripDay tripDay) { this.tripDay = tripDay; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+    public String getPlaceId() { return placeId; }
+    public void setPlaceId(String placeId) { this.placeId = placeId; }
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
     public String getLocationName() { return locationName; }
     public void setLocationName(String locationName) { this.locationName = locationName; }
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
     public BigDecimal getLatitude() { return latitude; }
     public void setLatitude(BigDecimal latitude) { this.latitude = latitude; }
     public BigDecimal getLongitude() { return longitude; }
@@ -114,20 +122,18 @@ public class TripItineraryItem {
     public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
     public LocalTime getEndTime() { return endTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
-    public Integer getEstimatedCost() { return estimatedCost; }
-    public void setEstimatedCost(Integer estimatedCost) { this.estimatedCost = estimatedCost; }
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
-    public String getTransportationType() { return transportationType; }
-    public void setTransportationType(String transportationType) { this.transportationType = transportationType; }
-    public Integer getTransportationDuration() { return transportationDuration; }
-    public void setTransportationDuration(Integer transportationDuration) { this.transportationDuration = transportationDuration; }
-    public Integer getTransportationCost() { return transportationCost; }
-    public void setTransportationCost(Integer transportationCost) { this.transportationCost = transportationCost; }
+    public Integer getStayDurationMinutes() { return stayDurationMinutes; }
+    public void setStayDurationMinutes(Integer stayDurationMinutes) { this.stayDurationMinutes = stayDurationMinutes; }
+    public BigDecimal getTravelToNextDistanceKm() { return travelToNextDistanceKm; }
+    public void setTravelToNextDistanceKm(BigDecimal travelToNextDistanceKm) { this.travelToNextDistanceKm = travelToNextDistanceKm; }
+    public Integer getTravelToNextDurationMinutes() { return travelToNextDurationMinutes; }
+    public void setTravelToNextDurationMinutes(Integer travelToNextDurationMinutes) { this.travelToNextDurationMinutes = travelToNextDurationMinutes; }
+    public String getTravelToNextMode() { return travelToNextMode; }
+    public void setTravelToNextMode(String travelToNextMode) { this.travelToNextMode = travelToNextMode; }
     public Integer getOrderSequence() { return orderSequence; }
     public void setOrderSequence(Integer orderSequence) { this.orderSequence = orderSequence; }
-    public Boolean getConfirmed() { return isConfirmed; }
-    public void setConfirmed(Boolean confirmed) { isConfirmed = confirmed; }
 }
 
 

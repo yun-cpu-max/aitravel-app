@@ -22,6 +22,26 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @return 해당 이메일의 사용자 (없으면 Optional.empty())
      */
     Optional<User> findByEmail(String email);
+    
+    /**
+     * Provider와 ProviderId로 사용자 조회 (OAuth 로그인용)
+     * - 같은 provider와 providerId 조합으로 조회하여 중복 가입 방지
+     * 
+     * @param provider 소셜 로그인 제공자 (예: "google")
+     * @param providerId 제공자에서의 사용자 ID
+     * @return 해당 provider와 providerId의 사용자
+     */
+    Optional<User> findByProviderAndProviderId(String provider, String providerId);
+    
+    /**
+     * 이메일과 Provider로 사용자 조회
+     * - 같은 이메일이라도 provider가 다르면 다른 계정으로 처리
+     * 
+     * @param email 사용자 이메일
+     * @param provider 소셜 로그인 제공자 (null이면 이메일 로그인)
+     * @return 해당 이메일과 provider의 사용자
+     */
+    Optional<User> findByEmailAndProvider(String email, String provider);
 }
 
 

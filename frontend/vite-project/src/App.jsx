@@ -18,14 +18,19 @@ import { AuthProvider } from './contexts/AuthContextProvider';
 import Navbar from './components/Navbar';
 import HeroSection from './components/HeroSection';
 import FeatureSection from './components/FeatureSection';
+import PopularDestinations from './components/PopularDestinations';
 import HowItWorksModal from './components/HowItWorksModal';
 import Footer from './components/Footer';
 
 // 페이지 컴포넌트들 import
 import TripPlanPage from './pages/TripPlanPage';
+import TripPlanPageEx1 from './pages/TripPlanPageEx1';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import DashboardPage from './pages/DashboardPage';
+import TripArchivePage from './pages/TripArchivePage';
+import SignUpPage from './pages/sign-up';
+import TripDetailPage from './pages/TripDetailPage';
 
 /**
  * App 컴포넌트
@@ -79,17 +84,26 @@ function App() {
                       <>
                         <HeroSection />
                         <FeatureSection />
+                        <PopularDestinations />
                       </>
                     }
                   />
                   {/* 로그인 페이지 라우트 */}
                   <Route path="/login" element={<LoginPage />} />
+                  {/* 회원가입 페이지 라우트 */}
+                  <Route path="/sign-up" element={<SignUpPage />} />
                   {/* 프로필 페이지 라우트 */}
                   <Route path="/profile" element={<ProfilePage />} />
                   {/* 여행 계획 페이지 라우트 */}
                   <Route path="/trip-plan" element={<TripPlanPage />} />
+                  {/* 비교용 새로운 여행 계획 마법사 라우트 */}
+                  <Route path="/trip-plan-ex1" element={<TripPlanPageEx1 />} />
                   {/* 대시보드 페이지 라우트 */}
                   <Route path="/dashboard" element={<DashboardPage />} />
+                  {/* 여행 기록 아카이브 페이지 라우트 */}
+                  <Route path="/archive/:tripId" element={<TripArchivePage />} />
+                  {/* 여행 상세 페이지 라우트 */}
+                  <Route path="/trip-detail/:tripId" element={<TripDetailPage />} />
                 </Routes>
           </main>
 
